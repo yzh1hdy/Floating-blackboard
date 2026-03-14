@@ -187,7 +187,7 @@
             0% { transform: scale(0.9); opacity: 0; }
             100% { transform: scale(1); opacity: 1; }
         }
-        .modal-content { animation: popIn 0.2s ease-out; }
+        .modal-content { animation: popIn 0.1s ease-out; }
 
         .number-result {
             display: none;
@@ -466,7 +466,7 @@
             height: 20vh;
             position: relative;
             overflow: visible;
-            animation: slideInFromRight 0.2s ease-out;
+            animation: slideInFromRight 0.1s ease-out;
         }
 
         @keyframes slideInFromRight {
@@ -537,6 +537,133 @@
             left: 0;
             pointer-events: none;
             z-index: 5;
+        }
+
+        /* 更多菜单样式 */
+        .more-menu {
+            display: none;
+            position: absolute;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(55, 95, 85, 0.98);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 12px;
+            padding: 16px;
+            z-index: 60;
+            min-width: 160px;
+            animation: menuPopIn 0.2s ease-out;
+        }
+
+        .more-menu.show {
+            display: block;
+        }
+
+        .more-menu-header {
+            color: rgba(255,255,255,0.95);
+            font-size: 14px;
+            margin-bottom: 12px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+            padding-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .more-menu-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .more-menu-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 8px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: rgba(255,255,255,0.9);
+            gap: 6px;
+        }
+
+        .more-menu-btn:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.05);
+        }
+
+        .more-menu-btn svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .more-menu-btn span {
+            font-size: 12px;
+        }
+
+        /* 关于对话框 - 使用清除弹窗样式但无顶部红色条 */
+        .about-dialog {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.2s ease-out forwards;
+        }
+
+        .about-dialog.show {
+            display: flex;
+        }
+
+        .about-modal {
+            background: #ffffff;
+            width: 100vw;
+            height: 20vh;
+            position: relative;
+            overflow: visible;
+            animation: slideInFromRight 0.1s ease-out;
+        }
+
+        .about-modal-content {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            height: 20vh;
+            position: relative;
+        }
+
+        .about-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #333333;
+            font-size: 1.2rem;
+            font-weight: 500;
+            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+        }
+
+        .about-close-btn {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 80px;
+            border: 5px solid white;
+            border-radius: 24px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: none;
+            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #ffef01;
+            color: #333333;
         }
     </style>
 <base target="_blank">
@@ -630,6 +757,43 @@
             <img id="img-clear" src="清除-松开.png" alt="清除">
         </button>
 
+        <div style="position: relative;">
+            <button id="btn-more" class="tool-btn" onclick="handleMoreClick(event)" title="更多">
+                <img id="img-more" src="更多-松开.png" alt="更多">
+            </button>
+            <div id="moreMenu" class="more-menu" onclick="event.stopPropagation()">
+                <div class="more-menu-header">更多功能</div>
+                <div class="more-menu-grid">
+                    <button class="more-menu-btn" onclick="startShapeDraw('circle')" title="圆形">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="9" />
+                        </svg>
+                        <span>圆形</span>
+                    </button>
+                    <button class="more-menu-btn" onclick="startShapeDraw('line')" title="直线">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="5" y1="19" x2="19" y2="5" />
+                        </svg>
+                        <span>直线</span>
+                    </button>
+                    <button class="more-menu-btn" onclick="startShapeDraw('dashed')" title="虚线">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3">
+                            <line x1="5" y1="19" x2="19" y2="5" />
+                        </svg>
+                        <span>虚线</span>
+                    </button>
+                    <button class="more-menu-btn" onclick="showAbout()" title="关于">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M12 16v-4" />
+                            <path d="M12 8h.01" />
+                        </svg>
+                        <span>关于</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <button id="btn-lottery" class="tool-btn" onclick="showLottery()" title="抽学号">
             <img id="img-lottery" src="抽学号-松开.png" alt="抽学号">
         </button>
@@ -661,10 +825,40 @@
         </div>
     </div>
 
+    <div id="resetAllConfirmBar" class="confirm-bar">
+        <div class="confirm-modal">
+            <div class="confirm-modal-top-bar"></div>
+            <div class="confirm-modal-content">
+                <div class="confirm-bar-text">确认重置黑板？所有页面内容将被清空且无法恢复。</div>
+                <div class="confirm-bar-buttons">
+                    <button onclick="executeResetAll()" class="confirm-btn confirm-btn-confirm">确认重置</button>
+                    <button onclick="closeResetAllModal()" class="confirm-btn confirm-btn-cancel">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="number-result" id="numberResult">
         <div class="result-close-layer" id="resultCloseLayer"></div>
         <div class="result-number" id="resultNumber"></div>
         <div class="result-tip">恭喜你中大奖啦！<br>花奈咪祝你每天欢愉~</div>
+    </div>
+
+    <!-- 关于对话框 - 新样式 -->
+    <div id="aboutDialog" class="about-dialog" onclick="closeAboutOnOverlay(event)">
+        <div class="confirm-modal">
+            <div class="confirm-modal-top-bar"></div>
+            <div class="confirm-modal-content">
+                <div class="confirm-bar-text">
+                    Interactive Blackboard<br>
+                    26w12a_最后更新：2026/03/14
+                </div>
+                <div class="confirm-bar-buttons">
+                    <button onclick="closeAbout()" class="confirm-btn confirm-btn-cancel">确定</button>
+                    <button onclick="confirmResetAll()" class="confirm-btn confirm-btn-confirm">重置黑板</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -700,6 +894,7 @@
             historyStep: -1,
             eraserRadius: 15,
             penMenuOpen: false,
+            moreMenuOpen: false,
             activeTouches: new Map(),
             canvas: null,
             ctx: null,
@@ -715,7 +910,16 @@
             gridCanvas: null,
             gridCtx: null,
             // 自动校正开关状态
-            autoCorrectionEnabled: true
+            autoCorrectionEnabled: true,
+            // 存储绘制的圆信息（用于吸附）
+            circles: [],
+            // 存储直线的端点信息（用于吸附）
+            lines: [],
+            // 图形绘制模式
+            shapeMode: null, // 'circle', 'line', 'dashed'
+            shapeStartPoint: null,
+            shapePreviewCanvas: null,
+            shapePreviewCtx: null
         };
 
         // --- 抽学号配置 ---
@@ -732,6 +936,8 @@
         const clearConfirmBar = document.getElementById('clearConfirmBar');
         const perfWarningBar = document.getElementById('perfWarningBar');
         const penMenu = document.getElementById('penMenu');
+        const moreMenu = document.getElementById('moreMenu');
+        const aboutDialog = document.getElementById('aboutDialog');
         const gridCanvas = document.getElementById('grid-canvas');
 
         const icons = {
@@ -739,6 +945,7 @@
             eraser: { btn: document.getElementById('tool-eraser'), img: document.getElementById('img-eraser'), released: '橡皮-松开.png', pressed: '橡皮-按下.png' },
             undo: { btn: document.getElementById('btn-undo'), img: document.getElementById('img-undo'), released: '撤回-松开.png', pressed: '撤回-按下.png' },
             clear: { btn: document.getElementById('btn-clear'), img: document.getElementById('img-clear'), released: '清除-松开.png', pressed: '清除-按下.png' },
+            more: { btn: document.getElementById('btn-more'), img: document.getElementById('img-more'), released: '更多-松开.png', pressed: '更多-按下.png' },
             lottery: { btn: document.getElementById('btn-lottery'), img: document.getElementById('img-lottery'), released: '抽学号-松开.png', pressed: '抽学号-按下.png' }
         };
 
@@ -768,11 +975,7 @@
 
             document.getElementById('resultCloseLayer').addEventListener('click', closeLottery);
 
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('#tool-pen') && !e.target.closest('#penMenu')) {
-                    closePenMenu();
-                }
-            });
+
 
             document.getElementById('prevPageBtn').addEventListener('click', () => goToPage(state.currentPage - 1));
             document.getElementById('nextPageBtn').addEventListener('click', () => {
@@ -814,7 +1017,7 @@
 
             ctx.clearRect(0, 0, width, height);
 
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
             ctx.lineWidth = 1;
 
             // 绘制垂直线
@@ -915,6 +1118,7 @@
         }
 
         function openPenMenu() {
+            closeMoreMenu(); // 先关闭更多菜单
             state.penMenuOpen = true;
             penMenu.classList.add('show');
         }
@@ -922,6 +1126,388 @@
         function closePenMenu() {
             state.penMenuOpen = false;
             penMenu.classList.remove('show');
+        }
+
+        // --- 更多菜单功能 ---
+        function handleMoreClick(e) {
+            // 获取事件对象（兼容不同浏览器）
+            var event = e || window.event;
+            if (event) {
+                event.stopPropagation();
+                if (event.preventDefault) event.preventDefault();
+            }
+
+            if (state.moreMenuOpen) {
+                closeMoreMenu();
+            } else {
+                openMoreMenu();
+            }
+        }
+
+        function openMoreMenu() {
+            closePenMenu(); // 先关闭笔设置菜单
+            state.moreMenuOpen = true;
+            moreMenu.classList.add('show');
+            if (icons.more && icons.more.img) {
+                icons.more.img.src = icons.more.pressed;
+            }
+        }
+
+        function closeMoreMenu() {
+            state.moreMenuOpen = false;
+            moreMenu.classList.remove('show');
+            if (icons.more && icons.more.img) {
+                icons.more.img.src = icons.more.released;
+            }
+        }
+
+        function closeAllMenus() {
+            closePenMenu();
+            closeMoreMenu();
+        }
+
+        // 点击外部关闭菜单
+        document.addEventListener('click', (e) => {
+            // 关闭笔设置菜单
+            if (state.penMenuOpen && !e.target.closest('#tool-pen') && !e.target.closest('#penMenu')) {
+                closePenMenu();
+            }
+            // 关闭更多菜单
+            if (state.moreMenuOpen && !e.target.closest('#btn-more') && !e.target.closest('#moreMenu')) {
+                closeMoreMenu();
+            }
+        });
+
+        // --- 图形绘制功能 ---
+        function startShapeDraw(shapeType) {
+            closeMoreMenu();
+            state.shapeMode = shapeType;
+            state.shapeStartPoint = null;
+            
+            // 创建预览canvas
+            if (!state.shapePreviewCanvas) {
+                const canvas = document.createElement('canvas');
+                canvas.id = 'shape-preview-canvas';
+                canvas.style.position = 'absolute';
+                canvas.style.top = '0';
+                canvas.style.left = '0';
+                canvas.style.pointerEvents = 'none';
+                canvas.style.zIndex = '15';
+                container.appendChild(canvas);
+                state.shapePreviewCanvas = canvas;
+                state.shapePreviewCtx = canvas.getContext('2d');
+            }
+            
+            const dpr = window.devicePixelRatio || 1;
+            const rect = container.getBoundingClientRect();
+            state.shapePreviewCanvas.width = rect.width * dpr;
+            state.shapePreviewCanvas.height = rect.height * dpr;
+            state.shapePreviewCanvas.style.width = rect.width + 'px';
+            state.shapePreviewCanvas.style.height = rect.height + 'px';
+            state.shapePreviewCtx.scale(dpr, dpr);
+            state.shapePreviewCtx.clearRect(0, 0, rect.width, rect.height);
+            
+            // 更改光标提示用户
+            container.style.cursor = 'crosshair';
+        }
+
+        function drawShapePreview(startX, startY, endX, endY) {
+            if (!state.shapePreviewCtx) return;
+
+            const ctx = state.shapePreviewCtx;
+            const rect = container.getBoundingClientRect();
+            ctx.clearRect(0, 0, rect.width, rect.height);
+
+            // 对起点和终点进行吸附（预览时）
+            const startSnap = snapToCircle(startX, startY);
+            if (startSnap.didSnap) {
+                startX = startSnap.x;
+                startY = startSnap.y;
+            }
+            const endSnap = snapToCircle(endX, endY);
+            if (endSnap.didSnap) {
+                endX = endSnap.x;
+                endY = endSnap.y;
+            }
+
+            ctx.lineWidth = penConfig.currentSize;
+            ctx.strokeStyle = penConfig.currentColor;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            if (state.shapeMode === 'circle') {
+                const radius = Math.sqrt((endX - startX) ** 2 + (endY - startY) ** 2);
+                ctx.beginPath();
+                ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                ctx.stroke();
+
+                // 预览时显示圆心十字标记
+                ctx.save();
+                ctx.strokeStyle = penConfig.currentColor;
+                ctx.lineWidth = Math.max(1.5, penConfig.currentSize * 0.5);
+                const markSize = Math.max(8, penConfig.currentSize * 3);
+                ctx.beginPath();
+                ctx.moveTo(startX - markSize, startY);
+                ctx.lineTo(startX + markSize, startY);
+                ctx.moveTo(startX, startY - markSize);
+                ctx.lineTo(startX, startY + markSize);
+                ctx.stroke();
+                ctx.restore();
+            } else if (state.shapeMode === 'line' || state.shapeMode === 'dashed') {
+                // 吸附逻辑：接近水平或垂直时自动吸附
+                const dx = endX - startX;
+                const dy = endY - startY;
+                const angleRad = Math.atan2(dy, dx);
+                const angleDeg = Math.abs(angleRad * 180 / Math.PI);
+                const adjustedAngle = angleDeg > 90 ? 180 - angleDeg : angleDeg;
+
+                let finalEndX = endX;
+                let finalEndY = endY;
+
+                // 如果接近水平（偏差<5度），吸附到水平
+                if (adjustedAngle < 5) {
+                    finalEndY = startY;
+                }
+                // 如果接近垂直（偏差<5度），吸附到垂直
+                else if (adjustedAngle > 85) {
+                    finalEndX = startX;
+                }
+
+                if (state.shapeMode === 'line') {
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(finalEndX, finalEndY);
+                    ctx.stroke();
+                } else if (state.shapeMode === 'dashed') {
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(finalEndX, finalEndY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+        }
+
+
+        // --- 吸附功能：将点吸附到圆心、圆上或直线端点 ---
+        function snapToCircle(x, y) {
+            const snapThreshold = 15; // 吸附阈值（像素）
+            let snappedX = x;
+            let snappedY = y;
+            let didSnap = false;
+
+            // 首先检查直线端点吸附（优先级最高）
+            for (const line of state.lines) {
+                // 检查起点
+                const distToStart = Math.sqrt((x - line.x1) ** 2 + (y - line.y1) ** 2);
+                if (distToStart < snapThreshold) {
+                    snappedX = line.x1;
+                    snappedY = line.y1;
+                    didSnap = true;
+                    return { x: snappedX, y: snappedY, didSnap };
+                }
+
+                // 检查终点
+                const distToEnd = Math.sqrt((x - line.x2) ** 2 + (y - line.y2) ** 2);
+                if (distToEnd < snapThreshold) {
+                    snappedX = line.x2;
+                    snappedY = line.y2;
+                    didSnap = true;
+                    return { x: snappedX, y: snappedY, didSnap };
+                }
+            }
+
+            for (const circle of state.circles) {
+                // 计算到圆心的距离
+                const dx = x - circle.x;
+                const dy = y - circle.y;
+                const distToCenter = Math.sqrt(dx * dx + dy * dy);
+
+                // 检查是否接近圆心
+                if (distToCenter < snapThreshold) {
+                    snappedX = circle.x;
+                    snappedY = circle.y;
+                    didSnap = true;
+                    break;
+                }
+
+                // 检查是否接近圆周（圆上）
+                const distToCircle = Math.abs(distToCenter - circle.radius);
+                if (distToCircle < snapThreshold) {
+                    // 计算圆上的点（沿相同方向）
+                    const angle = Math.atan2(dy, dx);
+                    snappedX = circle.x + Math.cos(angle) * circle.radius;
+                    snappedY = circle.y + Math.sin(angle) * circle.radius;
+                    didSnap = true;
+                    break;
+                }
+            }
+
+            return { x: snappedX, y: snappedY, didSnap };
+        }
+
+        function finishShapeDraw(endX, endY) {
+            if (!state.shapeStartPoint) return;
+
+            let startX = state.shapeStartPoint.x;
+            let startY = state.shapeStartPoint.y;
+
+            // 对起点进行吸附
+            const startSnap = snapToCircle(startX, startY);
+            if (startSnap.didSnap) {
+                startX = startSnap.x;
+                startY = startSnap.y;
+            }
+
+            // 对终点进行吸附
+            const endSnap = snapToCircle(endX, endY);
+            if (endSnap.didSnap) {
+                endX = endSnap.x;
+                endY = endSnap.y;
+            }
+
+            state.ctx.lineWidth = penConfig.currentSize;
+            state.ctx.strokeStyle = penConfig.currentColor;
+            state.ctx.lineCap = 'round';
+            state.ctx.lineJoin = 'round';
+            state.ctx.globalCompositeOperation = 'source-over';
+
+            // 用于存储最终的端点坐标（经过吸附后的坐标）
+            let finalStartX = startX;
+            let finalStartY = startY;
+            let finalEndX = endX;
+            let finalEndY = endY;
+
+            if (state.shapeMode === 'circle') {
+                const radius = Math.sqrt((endX - startX) ** 2 + (endY - startY) ** 2);
+                state.ctx.beginPath();
+                state.ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                state.ctx.stroke();
+
+                // 绘制圆心十字标记
+                state.ctx.save();
+                state.ctx.strokeStyle = penConfig.currentColor;
+                state.ctx.lineWidth = Math.max(1.5, penConfig.currentSize * 0.5);
+                const markSize = Math.max(8, penConfig.currentSize * 3);
+                state.ctx.beginPath();
+                state.ctx.moveTo(startX - markSize, startY);
+                state.ctx.lineTo(startX + markSize, startY);
+                state.ctx.moveTo(startX, startY - markSize);
+                state.ctx.lineTo(startX, startY + markSize);
+                state.ctx.stroke();
+                state.ctx.restore();
+
+            } else if (state.shapeMode === 'line' || state.shapeMode === 'dashed') {
+                // 吸附逻辑：接近水平或垂直时自动吸附
+                const dx = endX - startX;
+                const dy = endY - startY;
+                const angleRad = Math.atan2(dy, dx);
+                const angleDeg = Math.abs(angleRad * 180 / Math.PI);
+                const adjustedAngle = angleDeg > 90 ? 180 - angleDeg : angleDeg;
+
+                // 如果接近水平（偏差<5度），吸附到水平
+                if (adjustedAngle < 5) {
+                    finalEndY = startY;
+                }
+                // 如果接近垂直（偏差<5度），吸附到垂直
+                else if (adjustedAngle > 85) {
+                    finalEndX = startX;
+                }
+
+                if (state.shapeMode === 'line') {
+                    state.ctx.beginPath();
+                    state.ctx.moveTo(finalStartX, finalStartY);
+                    state.ctx.lineTo(finalEndX, finalEndY);
+                    state.ctx.stroke();
+                } else if (state.shapeMode === 'dashed') {
+                    state.ctx.setLineDash([5, 5]);
+                    state.ctx.beginPath();
+                    state.ctx.moveTo(finalStartX, finalStartY);
+                    state.ctx.lineTo(finalEndX, finalEndY);
+                    state.ctx.stroke();
+                    state.ctx.setLineDash([]);
+                }
+            }
+
+            pushHistory();
+
+            // 清除预览
+            if (state.shapePreviewCtx) {
+                const rect = container.getBoundingClientRect();
+                state.shapePreviewCtx.clearRect(0, 0, rect.width, rect.height);
+            }
+
+            // 保存圆的信息用于吸附（如果是绘制圆）
+            if (state.shapeMode === 'circle') {
+                const radius = Math.sqrt((endX - startX) ** 2 + (endY - startY) ** 2);
+                state.circles.push({
+                    x: startX,
+                    y: startY,
+                    radius: radius
+                });
+            }
+
+            // 保存直线的端点信息用于吸附（如果是绘制直线或虚线）
+            if (state.shapeMode === 'line' || state.shapeMode === 'dashed') {
+                state.lines.push({
+                    x1: finalStartX,
+                    y1: finalStartY,
+                    x2: finalEndX,
+                    y2: finalEndY
+                });
+            }
+
+            // 重置状态
+            state.shapeMode = null;
+            state.shapeStartPoint = null;
+            container.style.cursor = state.tool === 'pen' ? 'crosshair' : 'auto';
+        }
+
+        // --- 关于对话框 ---
+        function showAbout() {
+            closeMoreMenu();
+            aboutDialog.classList.add('show');
+        }
+
+        function closeAbout() {
+            aboutDialog.classList.remove('show');
+        }
+
+        function closeAboutOnOverlay(e) {
+            if (e.target === aboutDialog) {
+                closeAbout();
+            }
+        }
+
+        // --- 重置黑板功能 ---
+        function confirmResetAll() {
+            closeAbout();
+            document.getElementById('resetAllConfirmBar').classList.add('show');
+        }
+
+        function closeResetAllModal() {
+            document.getElementById('resetAllConfirmBar').classList.remove('show');
+        }
+
+        function executeResetAll() {
+            // 清空所有页面数据
+            state.pages = [null];
+            state.currentPage = 0;
+            state.history = [];
+            state.historyStep = -1;
+            state.circles = [];
+            state.lines = [];
+
+            // 清空当前画布
+            if (state.ctx && state.canvas) {
+                state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+            }
+
+            // 更新UI
+            updateUI();
+
+            closeResetAllModal();
         }
 
         function getRandomNumber() {
@@ -988,6 +1574,13 @@
         function handleMouseMove(e) {
             if (!state.isDrawing) return;
             const { x, y } = getCoordinates(e);
+            
+            // 图形绘制预览模式
+            if (state.shapeMode && state.shapeStartPoint) {
+                drawShapePreview(state.shapeStartPoint.x, state.shapeStartPoint.y, x, y);
+                return;
+            }
+            
             state.pendingPoints.push({x, y});
         }
 
@@ -1060,72 +1653,90 @@
 
 
         function handleTouchMove(e) {
-            e.preventDefault();
-            const rect = state.canvas.getBoundingClientRect();
+    e.preventDefault();
+    const rect = state.canvas.getBoundingClientRect();
 
-            for (let i = 0; i < e.changedTouches.length; i++) {
-                const touch = e.changedTouches[i];
-                const touchId = touch.identifier;
-                const touchState = state.activeTouches.get(touchId);
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const touchId = touch.identifier;
+        const touchState = state.activeTouches.get(touchId);
 
-                if (!touchState || !touchState.isDrawing) continue;
+        if (!touchState || !touchState.isDrawing) continue;
 
-                const x = touch.clientX - rect.left;
-                const y = touch.clientY - rect.top;
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
 
-                touchState.pendingPoints.push({x, y});
+        // 图形绘制预览模式
+        if (touchState.isShapeMode && state.shapeMode && state.shapeStartPoint) {
+            drawShapePreview(state.shapeStartPoint.x, state.shapeStartPoint.y, x, y);
+            touchState.lastX = x;
+            touchState.lastY = y;
+            continue;
+        }
 
-                // 处理待绘制点
-                if (touchState.pendingPoints.length > 0) {
-                    const points = touchState.pendingPoints.splice(0);
+        touchState.pendingPoints.push({x, y});
 
-                    if (state.tool === 'pen') {
-                        state.ctx.globalCompositeOperation = 'source-over';
-                        state.ctx.lineWidth = penConfig.currentSize;
-                        state.ctx.strokeStyle = penConfig.currentColor;
-                        state.ctx.lineCap = 'round';
-                        state.ctx.lineJoin = 'round';
+        // 处理待绘制点
+        if (touchState.pendingPoints.length > 0) {
+            const points = touchState.pendingPoints.splice(0);
 
-                        state.ctx.beginPath();
-                        state.ctx.moveTo(touchState.lastX, touchState.lastY);
+            if (state.tool === 'pen') {
+                state.ctx.globalCompositeOperation = 'source-over';
+                state.ctx.lineWidth = penConfig.currentSize;
+                state.ctx.strokeStyle = penConfig.currentColor;
+                state.ctx.lineCap = 'round';
+                state.ctx.lineJoin = 'round';
 
-                        for (let j = 0; j < points.length; j++) {
-                            const point = points[j];
-                            touchState.points.push(point);
+                state.ctx.beginPath();
+                state.ctx.moveTo(touchState.lastX, touchState.lastY);
 
-                            if (j > 0) {
-                                const prev = points[j - 1];
-                                const midX = (prev.x + point.x) / 2;
-                                const midY = (prev.y + point.y) / 2;
-                                state.ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
-                            }
-                        }
+                for (let j = 0; j < points.length; j++) {
+                    const point = points[j];
+                    touchState.points.push(point);
 
-                        const lastPoint = points[points.length - 1];
-                        state.ctx.lineTo(lastPoint.x, lastPoint.y);
-                        state.ctx.stroke();
-
-                        touchState.lastX = lastPoint.x;
-                        touchState.lastY = lastPoint.y;
-                    } else if (state.tool === 'eraser') {
-                        state.ctx.globalCompositeOperation = 'destination-out';
-
-                        for (const point of points) {
-                            state.ctx.beginPath();
-                            state.ctx.arc(point.x, point.y, state.eraserRadius, 0, Math.PI * 2);
-                            state.ctx.fill();
-                        }
-
-                        const lastPoint = points[points.length - 1];
-                        touchState.lastX = lastPoint.x;
-                        touchState.lastY = lastPoint.y;
+                    if (j > 0) {
+                        const prev = points[j - 1];
+                        const midX = (prev.x + point.x) / 2;
+                        const midY = (prev.y + point.y) / 2;
+                        state.ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
                     }
                 }
+
+                const lastPoint = points[points.length - 1];
+                state.ctx.lineTo(lastPoint.x, lastPoint.y);
+                state.ctx.stroke();
+
+                touchState.lastX = lastPoint.x;
+                touchState.lastY = lastPoint.y;
+            } else if (state.tool === 'eraser') {
+                state.ctx.globalCompositeOperation = 'destination-out';
+
+                for (const point of points) {
+                    state.ctx.beginPath();
+                    state.ctx.arc(point.x, point.y, state.eraserRadius, 0, Math.PI * 2);
+                    state.ctx.fill();
+                }
+
+                const lastPoint = points[points.length - 1];
+                touchState.lastX = lastPoint.x;
+                touchState.lastY = lastPoint.y;
             }
         }
+    }
+}
 
 
         function setTool(toolName) {
+            // 如果正在图形绘制模式，先退出
+            if (state.shapeMode) {
+                state.shapeMode = null;
+                state.shapeStartPoint = null;
+                if (state.shapePreviewCtx) {
+                    const rect = container.getBoundingClientRect();
+                    state.shapePreviewCtx.clearRect(0, 0, rect.width, rect.height);
+                }
+            }
+            
             if (state.tool === 'pen') {
                 icons.pen.img.src = icons.pen.released;
                 closePenMenu();
@@ -1160,6 +1771,9 @@
             if (!state.ctx || !state.canvas) return;
 
             state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+            state.circles = []; // 清空圆信息
+                state.lines = []; // 清空直线端点信息（页面切换时重置）
+            state.lines = []; // 清空直线端点信息
 
             const bitmap = state.pages[pageIndex];
             if (bitmap) {
@@ -1197,6 +1811,8 @@
             state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
             state.history = [];
             state.historyStep = -1;
+            state.circles = []; // 清空圆信息
+                state.lines = []; // 清空直线端点信息
             updateUI();
         }
 
@@ -1257,6 +1873,8 @@
                 state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
                 state.history = [];
                 state.historyStep = -1;
+                state.circles = []; // 清空圆信息
+                state.lines = []; // 清空直线端点信息
             }
             closeClearModal();
         }
@@ -1318,17 +1936,25 @@
             return true;
         }
 
-        function drawLine(x1, y1, x2, y2) {
+        function drawLine(x1, y1, x2, y2, isDashed = false) {
             state.ctx.globalCompositeOperation = 'source-over';
             state.ctx.lineWidth = penConfig.currentSize;
             state.ctx.strokeStyle = penConfig.currentColor;
             state.ctx.lineCap = 'round';
             state.ctx.lineJoin = 'round';
 
+            if (isDashed) {
+                state.ctx.setLineDash([5, 5]);
+            }
+
             state.ctx.beginPath();
             state.ctx.moveTo(x1, y1);
             state.ctx.lineTo(x2, y2);
             state.ctx.stroke();
+
+            if (isDashed) {
+                state.ctx.setLineDash([]);
+            }
         }
 
         function drawCircle(centerX, centerY, radius) {
@@ -1388,10 +2014,18 @@
         ////////////////////////////////////////////////
         // --- 优化的绘制逻辑 ---
 function startDrawing(e) {
+    const { x, y } = getCoordinates(e);
+    
+    // 图形绘制模式
+    if (state.shapeMode) {
+        state.shapeStartPoint = { x, y };
+        state.isDrawing = true;
+        return;
+    }
+    
     state.isDrawing = true;
     // 不要在这里立即 pushHistory，延迟到确定需要保存时
-    const { x, y } = getCoordinates(e);
-
+    
     state.currentStrokePoints = [{x, y}];
     state.pendingPoints = [{x, y}];
     state.lastX = x;
@@ -1409,8 +2043,17 @@ function startDrawing(e) {
     }
 }
 
-function stopDrawing() {
+function stopDrawing(e) {
     if (!state.isDrawing) return;
+    
+    // 图形绘制模式 - 完成绘制
+    if (state.shapeMode && state.shapeStartPoint && e) {
+        const { x, y } = getCoordinates(e);
+        finishShapeDraw(x, y);
+        state.isDrawing = false;
+        return;
+    }
+    
     state.isDrawing = false;
     state.pendingPoints = [];
     state.lastX = null;
@@ -1433,6 +2076,10 @@ function stopDrawing() {
 // --- 触摸事件也需要相应修改 ---
 function handleTouchStart(e) {
     e.preventDefault();
+
+    // 关闭所有菜单（笔设置菜单和更多菜单）
+    closeAllMenus();
+
     const rect = state.canvas.getBoundingClientRect();
 
     for (let i = 0; i < e.changedTouches.length; i++) {
@@ -1441,16 +2088,30 @@ function handleTouchStart(e) {
         const x = touch.clientX - rect.left;
         const y = touch.clientY - rect.top;
 
+        // 图形绘制模式处理
+        if (state.shapeMode) {
+            state.shapeStartPoint = { x, y };
+            state.isDrawing = true;
+            state.activeTouches.set(touchId, {
+                lastX: x,
+                lastY: y,
+                isDrawing: true,
+                points: [{x, y}],
+                pendingPoints: [{x, y}],
+                historyPushed: false,
+                isShapeMode: true  // 标记为图形绘制模式
+            });
+            return;
+        }
+
         state.activeTouches.set(touchId, {
             lastX: x,
             lastY: y,
             isDrawing: true,
             points: [{x, y}],
             pendingPoints: [{x, y}],
-            historyPushed: false  // 标记是否已保存历史
+            historyPushed: false
         });
-
-        // 移除这里的 pushHistory 调用
 
         state.ctx.beginPath();
         state.ctx.moveTo(x, y);
@@ -1461,12 +2122,29 @@ function handleTouchStart(e) {
 
 function handleTouchEnd(e) {
     e.preventDefault();
+    const rect = state.canvas.getBoundingClientRect();
+
     for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         const touchId = touch.identifier;
         const touchState = state.activeTouches.get(touchId);
 
-        if (touchState && touchState.isDrawing && state.tool === 'pen' && touchState.points.length > 1) {
+        if (!touchState) {
+            state.activeTouches.delete(touch.identifier);
+            continue;
+        }
+
+        // 图形绘制模式 - 完成绘制
+        if (touchState.isShapeMode && state.shapeMode && state.shapeStartPoint) {
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            finishShapeDraw(x, y);
+            state.isDrawing = false;
+            state.activeTouches.delete(touch.identifier);
+            continue;
+        }
+
+        if (touchState.isDrawing && state.tool === 'pen' && touchState.points.length > 1) {
             const converted = analyzeAndConvertStroke(touchState.points);
             // 只有没有被自动替换的笔画才保存历史
             if (!converted && !touchState.historyPushed) {
@@ -1497,6 +2175,13 @@ function analyzeAndConvertStroke(points) {
             redrawPreviousContent();
             // 绘制直线
             drawLine(start.x, start.y, end.x, end.y);
+            // 保存直线端点信息用于吸附
+            state.lines.push({
+                x1: start.x,
+                y1: start.y,
+                x2: end.x,
+                y2: end.y
+            });
             // 保存新状态到历史
             pushHistory();
             return true;
@@ -1534,7 +2219,7 @@ function redrawPreviousContent() {
         init();
     </script>
 
-    <div class="fixed bottom-3 left-4 text-white/50 text-sm z-50">   26w07a-测试版</div>
+    <div class="fixed bottom-3 left-4 text-white/50 text-sm z-50">   26w12a-测试版</div>
 
 </body>
 </html>
