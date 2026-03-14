@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Blackboard</title>
+    <script>
+        /*! tailwindcss v3.4.0 | MIT License | https://tailwindcss.com */
+        (function(){
+            const styles = document.createElement('style');
+            styles.textContent = `
+                *,::before,::after{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}
+                ::before,::after{--tw-content:''}
+                html,:host{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}
+                body{margin:0;line-height:inherit}
+                .fixed{position:fixed}
+                .absolute{position:absolute}
+                .relative{position:relative}
+                .inset-0{inset:0px}
+                .bottom-3{bottom:0.75rem}
+                .right-3{right:0.75rem}
+                .bottom-4{bottom:1rem}
+                .left-1\/2{left:50%}
+                .z-50{z-index:50}
+                .z-\[100\]{z-index:100}
+                .z-\[1001\]{z-index:1001}
+                .flex{display:flex}
+                .hidden{display:none}
+                .h-full{height:100%}
+                .h-\[28px\]{height:28px}
+                .h-\[56px\]{height:56px}
+                .w-full{width:100%}
+                .w-\[28px\]{width:28px}
+                .w-\[64px\]{width:64px}
+                .w-12{width:3rem}
+                .max-w-xs{max-width:20rem}
+                .-translate-x-1\/2{--tw-translate-x:-50%;transform:translate(var(--tw-translate-x),var(--tw-translate-y))rotate(var(--tw-rotate))skewX(var(--tw-skew-x))skewY(var(--tw-skew-y))scaleX(var(--tw-scale-x))scaleY(var(--tw-scale-y))}
+                .translate-x-\[-50\%\]{--tw-translate-x:-50%;transform:translate(var(--tw-translate-x),var(--tw-translate-y))rotate(var(--tw-rotate))skewX(var(--tw-skew-x))skewY(var(--tw-skew-y))scaleX(var(--tw-scale-x))scaleY(var(--tw-scale-y))}
+                .transform{transform:translate(var(--tw-translate-x),var(--tw-translate-y))rotate(var(--tw-rotate))skewX(var(--tw-skew-x))skewY(var(--tw-skew-y))scaleX(var(--tw-scale-x))scaleY(var(--tw-scale-y))}
+                .cursor-pointer{cursor:pointer}
+                .cursor-crosshair{cursor:crosshair}
+                .select-none{-webkit-user-select:none;user-select:none}
+                .flex-col{flex-direction:column}
+                .items-center{align-items:center}
+                .justify-center{justify-content:center}
+                .gap-0{gap:0px}
+                .gap-1{gap:0.25rem}
+                .gap-2{gap:0.5rem}
+                .gap-3{gap:0.75rem}
+                .rounded-lg{border-radius:0.5rem}
+                .rounded-2xl{border-radius:1rem}
+                .rounded-\[6px\]{border-radius:6px}
+                .rounded-full{border-radius:9999px}
+                .border{border-width:1px}
+                .border-2{border-width:2px}
+                .border-white\/20{border-color:rgba(255,255,255,0.2)}
+                .border-white\/10{border-color:rgba(255,255,255,0.1)}
+                .bg-\[\#0f261e\]{--tw-bg-opacity:1;background-color:rgb(15 38 30/var(--tw-bg-opacity))}
+                .bg-\[\#1a4236\]{--tw-bg-opacity:1;background-color:rgb(26 66 54/var(--tw-bg-opacity))}
+                .bg-black\/60{background-color:rgba(0,0,0,0.6)}
+                .bg-red-600\/80{background-color:rgba(220,38,38,0.8)}
+                .bg-white\/10{background-color:rgba(255,255,255,0.1)}
+                .p-6{padding:1.5rem}
+                .px-4{padding-left:1rem;padding-right:1rem}
+                .py-1\.5{padding-top:0.375rem;padding-bottom:0.375rem}
+                .text-center{text-align:center}
+                .font-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+                .text-sm{font-size:0.875rem;line-height:1.25rem}
+                .text-lg{font-size:1.125rem;line-height:1.75rem}
+                .font-bold{font-weight:700}
+                .text-white{--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity))}
+                .text-gray-200{--tw-text-opacity:1;color:rgb(229 231 235/var(--tw-text-opacity))}
+                .text-gray-300{--tw-text-opacity:1;color:rgb(209 213 219/var(--tw-text-opacity))}
+                .text-white\/50{color:rgba(255,255,255,0.5)}
+                .text-white\/60{color:rgba(255,255,255,0.6)}
+                .text-white\/70{color:rgba(255,255,255,0.7)}
+                .text-white\/90{color:rgba(255,255,255,0.9)}
+                .opacity-15{opacity:0.15}
+                .shadow-2xl{--tw-shadow:0 25px 50px -12px rgba(0,0,0,0.25);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}
+                .backdrop-blur-sm{--tw-backdrop-blur:blur(4px);-webkit-backdrop-filter:var(--tw-backdrop-blur)var(--tw-backdrop-brightness)var(--tw-backdrop-contrast)var(--tw-backdrop-grayscale)var(--tw-backdrop-hue-rotate)var(--tw-backdrop-invert)var(--tw-backdrop-opacity)var(--tw-backdrop-saturate)var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur)var(--tw-backdrop-brightness)var(--tw-backdrop-contrast)var(--tw-backdrop-grayscale)var(--tw-backdrop-hue-rotate)var(--tw-backdrop-invert)var(--tw-backdrop-opacity)var(--tw-backdrop-saturate)var(--tw-backdrop-sepia)}
+                .backdrop-blur-\[12px\]{--tw-backdrop-blur:blur(12px);-webkit-backdrop-filter:var(--tw-backdrop-blur)var(--tw-backdrop-brightness)var(--tw-backdrop-contrast)var(--tw-backdrop-grayscale)var(--tw-backdrop-hue-rotate)var(--tw-backdrop-invert)var(--tw-backdrop-opacity)var(--tw-backdrop-saturate)var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur)var(--tw-backdrop-brightness)var(--tw-backdrop-contrast)var(--tw-backdrop-grayscale)var(--tw-backdrop-hue-rotate)var(--tw-backdrop-invert)var(--tw-backdrop-opacity)var(--tw-backdrop-saturate)var(--tw-backdrop-sepia)}
+                .transition{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-timing-function:cubic-bezier(0.4,0,0.2,1);transition-duration:150ms}
+                .hover\:bg-white\/10:hover{background-color:rgba(255,255,255,0.1)}
+                .hover\:bg-red-500:hover{--tw-bg-opacity:1;background-color:rgb(239 68 68/var(--tw-bg-opacity))}
+                .hover\:scale-110:hover{--tw-scale-x:1.1;--tw-scale-y:1.1;transform:translate(var(--tw-translate-x),var(--tw-translate-y))rotate(var(--tw-rotate))skewX(var(--tw-skew-x))skewY(var(--tw-skew-y))scaleX(var(--tw-scale-x))scaleY(var(--tw-scale-y))}
+                .disabled\:cursor-default:disabled{cursor:default}
+                .disabled\:opacity-15:disabled{opacity:0.15}
+                @media (min-width: 640px){.sm\:px-6{padding-left:1.5rem;padding-right:1.5rem}}
+                @media (min-width: 1024px){.lg\:px-8{padding-left:2rem;padding-right:2rem}}
+            `;
+            document.head.appendChild(styles);
+        })();
+    </script>
+    <style>
+        @font-face {
+            font-family: 'HarmonyOS Sans SC';
+            src: url('Medium.ttf') format('truetype');
+            font-weight: 500;
+            font-style: normal;
+        }
+
+        * {
+            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #0f261e;
+            overflow: hidden;
+            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .cursor-pen { cursor: crosshair; }
+
+        .cursor-eraser-active {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.8)" stroke-width="1.5" style="shape-rendering: geometricPrecision;"/></svg>') 20 20, auto;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: rgba(255,255,255,0.6);
+            border-radius: 10px;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: none;
+            cursor: pointer;
+        }
+        .nav-btn:disabled { 
+            opacity: 0.15; 
+            cursor: default;
+            border-color: rgba(255,255,255,0.1);
+        }
+        .nav-btn:hover:not(:disabled) {
+            background: transparent;
+            color: rgba(255,255,255,0.6);
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        .toolbar {
+            position: fixed;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            gap: 0;
+        }
+
+        .tool-btn {
+            width: 64px;
+            height: 56px;
+            border: none;
+            background: transparent;
+            padding: 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tool-btn img {
+            width: 64px;
+            height: 56px;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            touch-action: none;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .modal-content { animation: popIn 0.2s ease-out; }
+
+        .number-result {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.55);
+            backdrop-filter: blur(8px);
+            z-index: 101;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .result-number {
+            font-size: 8rem;
+            font-weight: 500;
+            color: #FFF;
+            text-shadow: 0 0 8px rgba(255,230,150,.7),
+                        0 0 14px rgba(255,230,150,.4);
+            animation: numberAppear 0.5s ease-out;
+            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        @keyframes numberAppear {
+            0% { transform: scale(1.2); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .result-tip {
+            margin-top: 2rem;
+            font-size: .9rem;
+            color: rgba(255,255,255,.7);
+            letter-spacing: 1px;
+            pointer-events: none;
+            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .result-close-layer {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            cursor: pointer;
+        }
+
+        .result-number, .result-tip {
+            position: relative;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .pen-menu {
+            display: none;
+            position: absolute;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(55, 95, 85, 0.98);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 12px;
+            padding: 20px;
+            z-index: 60;
+            min-width: 220px;
+            animation: menuPopIn 0.2s ease-out;
+        }
+
+        .pen-menu.show {
+            display: block;
+        }
+
+        @keyframes menuPopIn {
+            0% { transform: translateX(-50%) translateY(10px); opacity: 0; }
+            100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+
+        .pen-menu-header {
+            color: rgba(255,255,255,0.95);
+            font-size: 14px;
+            margin-bottom: 16px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+            padding-bottom: 12px;
+            font-weight: 500;
+        }
+
+        .pen-menu-close {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            color: rgba(255,255,255,0.6);
+            cursor: pointer;
+            font-size: 20px;
+            line-height: 1;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .pen-menu-close:hover {
+            color: rgba(255,255,255,0.95);
+            background: rgba(255,255,255,0.1);
+        }
+
+        .color-section {
+            margin-bottom: 16px;
+        }
+
+        .section-label {
+            color: rgba(255,255,255,0.8);
+            font-size: 12px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .color-palette {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .color-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .color-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .color-btn.active {
+            border-color: #00c881;
+            box-shadow: 0 0 0 2px rgba(0, 200, 129, 0.3);
+        }
+
+        .color-btn.active::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #00c881;
+            font-size: 16px;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .size-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .size-presets {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .size-preset-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .size-preset-btn:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.1);
+        }
+
+        .size-preset-btn.active {
+            background: rgba(0, 200, 129, 0.2);
+            border-color: #00c881;
+            box-shadow: 0 0 0 2px rgba(0, 200, 129, 0.2);
+        }
+
+        .size-preset-dot {
+            background: rgba(255,255,255,0.9);
+            border-radius: 50%;
+        }
+
+        /* 网格线开关样式 */
+        .grid-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .grid-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .grid-toggle:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .grid-toggle-label {
+            color: rgba(255,255,255,0.9);
+            font-size: 13px;
+        }
+
+        .grid-toggle-switch {
+            width: 44px;
+            height: 24px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .grid-toggle-switch.active {
+            background: #00c881;
+        }
+
+        .grid-toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .grid-toggle-switch.active::after {
+            left: 22px;
+        }
+
+        .confirm-bar {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.2s ease-out forwards;
+        }
+
+        .confirm-bar.show {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            0% { background: rgba(0,0,0,0); }
+            100% { background: rgba(0,0,0,0.5); }
+        }
+
+        .confirm-modal {
+            background: #ffffff;
+            width: 100vw;
+            height: 20vh;
+            position: relative;
+            overflow: visible;
+            animation: slideInFromRight 0.2s ease-out;
+        }
+
+        @keyframes slideInFromRight {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(0); }
+        }
+
+        .confirm-modal-top-bar {
+            height: 16px;
+            background: #ff4145;
+            width: 100%;
+        }
+
+        .confirm-modal-content {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            height: calc(20vh - 16px);
+            position: relative;
+        }
+
+        .confirm-bar-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #333333;
+            font-size: 1.2rem;
+            font-weight: 500;
+            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+        }
+
+        .confirm-bar-buttons {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+        }
+
+        .confirm-btn {
+            padding: 8px 80px;
+            border: 5px solid white;
+            border-radius: 24px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: none;
+            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .confirm-btn-cancel {
+            background-color: #ffef01;
+            color: #333333;
+        }
+
+        .confirm-btn-confirm {
+            background-color: #ff4145;
+            color: #ffffff;
+        }
+
+        /* 网格线层 */
+        #grid-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+    </style>
+<base target="_blank">
+</head>
+<body class="text-gray-200 select-none">
+
+    <!-- Canvas Container -->
+    <div id="canvas-container" class="cursor-pen w-full h-full fixed inset-0"></div>
+
+    <!-- Grid Canvas -->
+    <canvas id="grid-canvas"></canvas>
+
+    <!-- Bottom Right: Clean Page Navigation -->
+    <div class="fixed bottom-3 right-3 z-50 flex items-center gap-1">
+        <button id="prevPageBtn" class="nav-btn" title="上一页">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15 18l-6-6 6-6" />
+            </svg>
+        </button>
+
+        <div class="text-sm font-微软雅黑 text-white/50 w-12 text-center select-none" id="pageIndicator">1/1</div>
+
+        <button id="nextPageBtn" class="nav-btn" title="下一页">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18l6-6-6-6" />
+            </svg>
+        </button>
+    </div>
+
+    <!-- Bottom Center: Toolbar -->
+    <div class="toolbar">
+        <div style="position: relative;">
+            <button id="tool-pen" class="tool-btn" onclick="handlePenClick()" title="画笔">
+                <img id="img-pen" src="笔-松开.png" alt="笔">
+            </button>
+            <div id="penMenu" class="pen-menu">
+                <span class="pen-menu-close" onclick="closePenMenu()">&times;</span>
+                <div class="pen-menu-header">画笔设置</div>
+
+                <div class="color-section">
+                    <span class="section-label">颜色</span>
+                    <div class="color-palette" id="colorPalette"></div>
+                </div>
+
+                <div class="size-section">
+                    <span class="section-label">粗细</span>
+                    <div class="size-presets">
+                        <button class="size-preset-btn" onclick="setPenSize(1)" title="细">
+                            <div class="size-preset-dot" style="width: 4px; height: 4px;"></div>
+                        </button>
+                        <button class="size-preset-btn active" onclick="setPenSize(2.5)" title="中">
+                            <div class="size-preset-dot" style="width: 8px; height: 8px;"></div>
+                        </button>
+                        <button class="size-preset-btn" onclick="setPenSize(5)" title="粗">
+                            <div class="size-preset-dot" style="width: 12px; height: 12px;"></div>
+                        </button>
+                        <button class="size-preset-btn" onclick="setPenSize(10)" title="特粗">
+                            <div class="size-preset-dot" style="width: 16px; height: 16px;"></div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 网格线开关 -->
+                <div class="grid-section">
+
+                    <div class="grid-toggle" onclick="toggleGrid()">
+                        <span class="grid-toggle-label">显示网格线</span>
+                        <div class="grid-toggle-switch" id="gridToggleSwitch"></div>
+                    </div>
+                </div>
+
+                <!-- 自动校正开关 -->
+                <div class="grid-section">
+                    <div class="grid-toggle" onclick="toggleAutoCorrection()">
+                        <span class="grid-toggle-label">自动校正</span>
+                        <div class="grid-toggle-switch" id="autoCorrectionSwitch"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button id="tool-eraser" class="tool-btn" onclick="setTool('eraser')" title="橡皮">
+            <img id="img-eraser" src="橡皮-松开.png" alt="橡皮">
+        </button>
+
+        <button id="btn-undo" class="tool-btn" onclick="undo()" title="撤回">
+            <img id="img-undo" src="撤回-松开.png" alt="撤回">
+        </button>
+
+        <button id="btn-clear" class="tool-btn" onclick="confirmClear()" title="清空">
+            <img id="img-clear" src="清除-松开.png" alt="清除">
+        </button>
+
+        <button id="btn-lottery" class="tool-btn" onclick="showLottery()" title="抽学号">
+            <img id="img-lottery" src="抽学号-松开.png" alt="抽学号">
+        </button>
+    </div>
+
+    <div id="clearConfirmBar" class="confirm-bar">
+        <div class="confirm-modal">
+            <div class="confirm-modal-top-bar"></div>
+            <div class="confirm-modal-content">
+                <div class="confirm-bar-text">确认清空当前页面？清空后无法撤回。</div>
+                <div class="confirm-bar-buttons">
+                    <button onclick="executeClear()" class="confirm-btn confirm-btn-confirm">清空</button>
+                    <button onclick="closeClearModal()" class="confirm-btn confirm-btn-cancel">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="perfWarningBar" class="confirm-bar">
+        <div class="confirm-modal">
+            <div class="confirm-modal-top-bar"></div>
+            <div class="confirm-modal-content">
+                <div class="confirm-bar-text">设备性能严重不足，继续添加可能导致书写卡顿。</div>
+                <div class="confirm-bar-buttons">
+                    <button onclick="confirmAddPage()" class="confirm-btn confirm-btn-confirm">继续加页</button>
+                    <button onclick="closePerfModal()" class="confirm-btn confirm-btn-cancel">取消操作</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="number-result" id="numberResult">
+        <div class="result-close-layer" id="resultCloseLayer"></div>
+        <div class="result-number" id="resultNumber"></div>
+        <div class="result-tip">恭喜你中大奖啦！<br>花奈咪祝你每天欢愉~</div>
+    </div>
+
+    <script>
+        // --- 笔设置配置 ---
+        const penConfig = {
+            colors: [
+                { name: '白色', value: '#ffffff', default: true },
+                { name: '红色', value: '#ff1000' },
+                { name: '橙色', value: '#ff8b00' },
+                { name: '黄色', value: '#ffc510' },
+                { name: '紫色', value: '#321eb5' },
+                { name: '蓝色', value: '#326ed9' },
+                { name: '深绿', value: '#306c00' },
+                { name: '浅绿', value: '#66d552' },
+                { name: '粉色', value: '#ff1ecf' },
+                { name: '青色', value: '#4ea1b7' },
+                { name: '棕色', value: '#8b7e6e' },
+                { name: '黑色', value: '#000000' }
+            ],
+            sizes: [1, 2.5, 5, 10],
+            currentColor: '#ffffff',
+            currentSize: 2.5
+        };
+
+        // --- State Management ---
+        const state = {
+            tool: 'pen',
+            isDrawing: false,
+            currentPage: 0,
+            pages: [],
+            perfWarningThreshold: 10,
+            history: [],
+            historyStep: -1,
+            eraserRadius: 15,
+            penMenuOpen: false,
+            activeTouches: new Map(),
+            canvas: null,
+            ctx: null,
+            dpr: 1,
+            pendingAddPage: false,
+            currentStrokePoints: [],
+            // 绘制优化相关
+            isDrawingFrame: false,
+            pendingPoints: [],
+            // 网格线
+            gridEnabled: false,
+            gridSize: 30,
+            gridCanvas: null,
+            gridCtx: null,
+            // 自动校正开关状态
+            autoCorrectionEnabled: true
+        };
+
+        // --- 抽学号配置 ---
+        const numberList = [
+            '01', '02', '03', '05', '06', '07', '08', '09', '10', '11',
+            '12', '14', '16', '17', '18', '19', '20', '21', '22', '23',
+            '24', '25', '26', '27', '28', '29', '31', '33', '34', '35',
+            '37', '39'
+        ];
+
+        // --- DOM Elements ---
+        const container = document.getElementById('canvas-container');
+        const pageIndicator = document.getElementById('pageIndicator');
+        const clearConfirmBar = document.getElementById('clearConfirmBar');
+        const perfWarningBar = document.getElementById('perfWarningBar');
+        const penMenu = document.getElementById('penMenu');
+        const gridCanvas = document.getElementById('grid-canvas');
+
+        const icons = {
+            pen: { btn: document.getElementById('tool-pen'), img: document.getElementById('img-pen'), released: '笔-松开.png', pressed: '笔-按下.png' },
+            eraser: { btn: document.getElementById('tool-eraser'), img: document.getElementById('img-eraser'), released: '橡皮-松开.png', pressed: '橡皮-按下.png' },
+            undo: { btn: document.getElementById('btn-undo'), img: document.getElementById('img-undo'), released: '撤回-松开.png', pressed: '撤回-按下.png' },
+            clear: { btn: document.getElementById('btn-clear'), img: document.getElementById('img-clear'), released: '清除-松开.png', pressed: '清除-按下.png' },
+            lottery: { btn: document.getElementById('btn-lottery'), img: document.getElementById('img-lottery'), released: '抽学号-松开.png', pressed: '抽学号-按下.png' }
+        };
+
+        // --- Initialization ---
+        function init() {
+            createCanvas();
+            createGridCanvas();
+            state.pages.push(null);
+            updateUI();
+            updateToolIcons();
+            initPenMenu();
+            updateAutoCorrectionSwitch();
+            window.addEventListener('resize', handleResize);
+
+            document.addEventListener('contextmenu', e => e.preventDefault());
+
+            Object.keys(icons).forEach(key => {
+                const item = icons[key];
+                item.btn.addEventListener('mousedown', () => item.img.src = item.pressed);
+                item.btn.addEventListener('mouseup', () => {
+                    if (key !== state.tool) item.img.src = item.released;
+                });
+                item.btn.addEventListener('mouseleave', () => {
+                    if (key !== state.tool) item.img.src = item.released;
+                });
+            });
+
+            document.getElementById('resultCloseLayer').addEventListener('click', closeLottery);
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#tool-pen') && !e.target.closest('#penMenu')) {
+                    closePenMenu();
+                }
+            });
+
+            document.getElementById('prevPageBtn').addEventListener('click', () => goToPage(state.currentPage - 1));
+            document.getElementById('nextPageBtn').addEventListener('click', () => {
+                if (state.currentPage < state.pages.length - 1) {
+                    goToPage(state.currentPage + 1);
+                } else {
+                    if (state.pages.length >= state.perfWarningThreshold) {
+                        showPerfWarning();
+                    } else {
+                        addPage();
+                    }
+                }
+            });
+        }
+
+        // --- 网格线功能 ---
+        function createGridCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = container.getBoundingClientRect();
+
+            gridCanvas.width = rect.width * dpr;
+            gridCanvas.height = rect.height * dpr;
+            gridCanvas.style.width = rect.width + 'px';
+            gridCanvas.style.height = rect.height + 'px';
+
+            state.gridCtx = gridCanvas.getContext('2d');
+            state.gridCtx.scale(dpr, dpr);
+
+            drawGrid();
+        }
+
+        function drawGrid() {
+            if (!state.gridCtx || !state.gridEnabled) return;
+
+            const ctx = state.gridCtx;
+            const width = gridCanvas.width / state.dpr;
+            const height = gridCanvas.height / state.dpr;
+            const gridSize = state.gridSize;
+
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 1;
+
+            // 绘制垂直线
+            for (let x = 0; x <= width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+            }
+
+            // 绘制水平线
+            for (let y = 0; y <= height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+        }
+
+        function toggleGrid() {
+            state.gridEnabled = !state.gridEnabled;
+            const switchEl = document.getElementById('gridToggleSwitch');
+
+            if (state.gridEnabled) {
+                switchEl.classList.add('active');
+                gridCanvas.style.display = 'block';
+                drawGrid();
+            } else {
+                switchEl.classList.remove('active');
+                gridCanvas.style.display = 'none';
+            }
+        }
+
+        function updateGridCanvas() {
+            if (state.gridEnabled) {
+                drawGrid();
+            }
+        }
+
+        function toggleAutoCorrection() {
+            state.autoCorrectionEnabled = !state.autoCorrectionEnabled;
+            const switchEl = document.getElementById('autoCorrectionSwitch');
+            if (state.autoCorrectionEnabled) {
+                switchEl.classList.add('active');
+            } else {
+                switchEl.classList.remove('active');
+            }
+        }
+
+        function updateAutoCorrectionSwitch() {
+            const switchEl = document.getElementById('autoCorrectionSwitch');
+            if (state.autoCorrectionEnabled) {
+                switchEl.classList.add('active');
+            } else {
+                switchEl.classList.remove('active');
+            }
+        }
+
+        // --- 初始化笔设置菜单 ---
+        function initPenMenu() {
+            const palette = document.getElementById('colorPalette');
+            penConfig.colors.forEach((color, index) => {
+                const btn = document.createElement('div');
+                btn.className = 'color-btn' + (color.default ? ' active' : '');
+                btn.style.backgroundColor = color.value;
+                btn.title = color.name;
+                btn.onclick = () => setPenColor(color.value, btn);
+                palette.appendChild(btn);
+            });
+        }
+
+        function setPenColor(color, btnElement) {
+            penConfig.currentColor = color;
+            document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active'));
+            if (btnElement) btnElement.classList.add('active');
+        }
+
+        function setPenSize(size) {
+            penConfig.currentSize = size;
+            document.querySelectorAll('.size-preset-btn').forEach((btn, index) => {
+                const presetSize = penConfig.sizes[index];
+                if (Math.abs(presetSize - size) < 0.1) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        function handlePenClick() {
+            if (state.tool === 'pen' && state.penMenuOpen) {
+                closePenMenu();
+            } else if (state.tool === 'pen' && !state.penMenuOpen) {
+                openPenMenu();
+            } else {
+                setTool('pen');
+            }
+        }
+
+        function openPenMenu() {
+            state.penMenuOpen = true;
+            penMenu.classList.add('show');
+        }
+
+        function closePenMenu() {
+            state.penMenuOpen = false;
+            penMenu.classList.remove('show');
+        }
+
+        function getRandomNumber() {
+            return numberList[Math.floor(Math.random() * numberList.length)];
+        }
+
+        function showLottery() {
+            const randomNumber = getRandomNumber();
+            document.getElementById('resultNumber').textContent = randomNumber;
+            document.getElementById('numberResult').style.display = 'flex';
+        }
+
+        function closeLottery() {
+            document.getElementById('numberResult').style.display = 'none';
+        }
+
+        // --- 优化的Canvas绘制 ---
+        function createCanvas() {
+            const canvas = document.createElement('canvas');
+            canvas.id = 'main-canvas';
+
+            const dpr = window.devicePixelRatio || 1;
+            const rect = container.getBoundingClientRect();
+
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+            canvas.style.zIndex = 10;
+
+            const ctx = canvas.getContext('2d', { 
+                willReadFrequently: true,
+                alpha: true
+            });
+
+            ctx.scale(dpr, dpr);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = penConfig.currentSize;
+            ctx.strokeStyle = penConfig.currentColor;
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            // 优化的事件处理
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+
+            canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+            canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+            container.appendChild(canvas);
+
+            state.canvas = canvas;
+            state.ctx = ctx;
+            state.dpr = dpr;
+        }
+
+
+
+        function handleMouseMove(e) {
+            if (!state.isDrawing) return;
+            const { x, y } = getCoordinates(e);
+            state.pendingPoints.push({x, y});
+        }
+
+        function drawFrame() {
+            if (!state.isDrawing && state.pendingPoints.length === 0) {
+                state.isDrawingFrame = false;
+                return;
+            }
+
+            if (state.pendingPoints.length > 0 && state.isDrawing) {
+                const points = state.pendingPoints.splice(0);
+
+                if (state.tool === 'pen') {
+                    state.ctx.globalCompositeOperation = 'source-over';
+                    state.ctx.lineWidth = penConfig.currentSize;
+                    state.ctx.strokeStyle = penConfig.currentColor;
+                    state.ctx.lineCap = 'round';
+                    state.ctx.lineJoin = 'round';
+
+                    state.ctx.beginPath();
+                    state.ctx.moveTo(state.lastX, state.lastY);
+
+                    for (let i = 0; i < points.length; i++) {
+                        const point = points[i];
+                        state.currentStrokePoints.push(point);
+
+                        // 使用二次贝塞尔曲线进行平滑
+                        if (i > 0) {
+                            const prev = points[i - 1];
+                            const midX = (prev.x + point.x) / 2;
+                            const midY = (prev.y + point.y) / 2;
+                            state.ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
+                        }
+                    }
+
+                    const lastPoint = points[points.length - 1];
+                    state.ctx.lineTo(lastPoint.x, lastPoint.y);
+                    state.ctx.stroke();
+
+                    state.lastX = lastPoint.x;
+                    state.lastY = lastPoint.y;
+                } else if (state.tool === 'eraser') {
+                    state.ctx.globalCompositeOperation = 'destination-out';
+
+                    for (const point of points) {
+                        state.ctx.beginPath();
+                        state.ctx.arc(point.x, point.y, state.eraserRadius, 0, Math.PI * 2);
+                        state.ctx.fill();
+                    }
+
+                    const lastPoint = points[points.length - 1];
+                    state.lastX = lastPoint.x;
+                    state.lastY = lastPoint.y;
+                }
+            }
+
+            requestAnimationFrame(drawFrame);
+        }
+
+
+
+        function getCoordinates(e) {
+            const rect = state.canvas.getBoundingClientRect();
+            return { 
+                x: e.clientX - rect.left, 
+                y: e.clientY - rect.top 
+            };
+        }
+
+
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            const rect = state.canvas.getBoundingClientRect();
+
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const touchId = touch.identifier;
+                const touchState = state.activeTouches.get(touchId);
+
+                if (!touchState || !touchState.isDrawing) continue;
+
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+
+                touchState.pendingPoints.push({x, y});
+
+                // 处理待绘制点
+                if (touchState.pendingPoints.length > 0) {
+                    const points = touchState.pendingPoints.splice(0);
+
+                    if (state.tool === 'pen') {
+                        state.ctx.globalCompositeOperation = 'source-over';
+                        state.ctx.lineWidth = penConfig.currentSize;
+                        state.ctx.strokeStyle = penConfig.currentColor;
+                        state.ctx.lineCap = 'round';
+                        state.ctx.lineJoin = 'round';
+
+                        state.ctx.beginPath();
+                        state.ctx.moveTo(touchState.lastX, touchState.lastY);
+
+                        for (let j = 0; j < points.length; j++) {
+                            const point = points[j];
+                            touchState.points.push(point);
+
+                            if (j > 0) {
+                                const prev = points[j - 1];
+                                const midX = (prev.x + point.x) / 2;
+                                const midY = (prev.y + point.y) / 2;
+                                state.ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
+                            }
+                        }
+
+                        const lastPoint = points[points.length - 1];
+                        state.ctx.lineTo(lastPoint.x, lastPoint.y);
+                        state.ctx.stroke();
+
+                        touchState.lastX = lastPoint.x;
+                        touchState.lastY = lastPoint.y;
+                    } else if (state.tool === 'eraser') {
+                        state.ctx.globalCompositeOperation = 'destination-out';
+
+                        for (const point of points) {
+                            state.ctx.beginPath();
+                            state.ctx.arc(point.x, point.y, state.eraserRadius, 0, Math.PI * 2);
+                            state.ctx.fill();
+                        }
+
+                        const lastPoint = points[points.length - 1];
+                        touchState.lastX = lastPoint.x;
+                        touchState.lastY = lastPoint.y;
+                    }
+                }
+            }
+        }
+
+
+        function setTool(toolName) {
+            if (state.tool === 'pen') {
+                icons.pen.img.src = icons.pen.released;
+                closePenMenu();
+            }
+            if (state.tool === 'eraser') icons.eraser.img.src = icons.eraser.released;
+
+            state.tool = toolName;
+            updateToolIcons();
+
+            container.className = toolName === 'pen' ? 
+                'cursor-pen w-full h-full fixed inset-0' : 
+                'cursor-eraser-active w-full h-full fixed inset-0';
+        }
+
+        function updateToolIcons() {
+            if (state.tool === 'pen') {
+                icons.pen.img.src = icons.pen.pressed;
+                icons.eraser.img.src = icons.eraser.released;
+            } else {
+                icons.pen.img.src = icons.pen.released;
+                icons.eraser.img.src = icons.eraser.pressed;
+            }
+        }
+
+        function saveCurrentPage() {
+            if (!state.canvas) return;
+            const dataURL = state.canvas.toDataURL('image/png');
+            state.pages[state.currentPage] = dataURL;
+        }
+
+        function loadPageBitmap(pageIndex) {
+            if (!state.ctx || !state.canvas) return;
+
+            state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+
+            const bitmap = state.pages[pageIndex];
+            if (bitmap) {
+                const img = new Image();
+                img.onload = function() {
+                    const rect = state.canvas.getBoundingClientRect();
+                    state.ctx.drawImage(img, 0, 0, rect.width, rect.height);
+                };
+                img.src = bitmap;
+            }
+        }
+
+        function showPerfWarning() {
+            state.pendingAddPage = true;
+            perfWarningBar.classList.add('show');
+        }
+
+        function closePerfModal() {
+            perfWarningBar.classList.remove('show');
+            state.pendingAddPage = false;
+        }
+
+        function confirmAddPage() {
+            perfWarningBar.classList.remove('show');
+            if (state.pendingAddPage) {
+                state.pendingAddPage = false;
+                addPage();
+            }
+        }
+
+        function addPage() {
+            saveCurrentPage();
+            state.pages.push(null);
+            state.currentPage = state.pages.length - 1;
+            state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+            state.history = [];
+            state.historyStep = -1;
+            updateUI();
+        }
+
+        function goToPage(index) {
+            if (index < 0 || index >= state.pages.length) return;
+            if (index === state.currentPage) return;
+
+            saveCurrentPage();
+            state.currentPage = index;
+            loadPageBitmap(state.currentPage);
+            state.history = [];
+            state.historyStep = -1;
+            updateUI();
+        }
+
+        function updateUI() {
+            pageIndicator.innerText = `${state.currentPage + 1}/${state.pages.length}`;
+            document.getElementById('prevPageBtn').disabled = state.currentPage === 0;
+        }
+
+        function pushHistory() {
+            if (!state.canvas || !state.ctx) return;
+
+            if (state.historyStep < state.history.length - 1) {
+                state.history = state.history.slice(0, state.historyStep + 1);
+            }
+
+            const imageData = state.ctx.getImageData(0, 0, state.canvas.width, state.canvas.height);
+            state.history.push(imageData);
+            state.historyStep++;
+
+            if (state.history.length > 20) {
+                state.history.shift();
+                state.historyStep--;
+            }
+        }
+
+        function undo() {
+            if (state.historyStep >= 0) {
+                const imageData = state.history[state.historyStep];
+                state.ctx.putImageData(imageData, 0, 0);
+                state.historyStep--;
+            } else {
+                state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+            }
+        }
+
+        function confirmClear() { 
+            clearConfirmBar.classList.add('show'); 
+        }
+
+        function closeClearModal() { 
+            clearConfirmBar.classList.remove('show'); 
+        }
+
+        function executeClear() {
+            if (state.ctx && state.canvas) {
+                state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+                state.history = [];
+                state.historyStep = -1;
+            }
+            closeClearModal();
+        }
+
+
+
+        function isCloseToLine(points, threshold) {
+            if (points.length < 2) return false;
+
+            const start = points[0];
+            const end = points[points.length - 1];
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+
+            if (length === 0) return false;
+
+            let maxDistance = 0;
+            for (let i = 1; i < points.length - 1; i++) {
+                const point = points[i];
+                const distance = Math.abs(dy * (point.x - start.x) - dx * (point.y - start.y)) / length;
+                maxDistance = Math.max(maxDistance, distance);
+            }
+
+            return maxDistance < threshold;
+        }
+
+        function fitCircle(points) {
+            if (points.length < 3) return null;
+
+            let sumX = 0, sumY = 0;
+            for (const p of points) {
+                sumX += p.x;
+                sumY += p.y;
+            }
+            const centerX = sumX / points.length;
+            const centerY = sumY / points.length;
+
+            let sumRadius = 0;
+            for (const p of points) {
+                const dx = p.x - centerX;
+                const dy = p.y - centerY;
+                sumRadius += Math.sqrt(dx * dx + dy * dy);
+            }
+            const radius = sumRadius / points.length;
+
+            return { centerX, centerY, radius };
+        }
+
+        function isCloseToCircle(points, circle, threshold) {
+            for (const p of points) {
+                const dx = p.x - circle.centerX;
+                const dy = p.y - circle.centerY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (Math.abs(distance - circle.radius) > threshold) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function drawLine(x1, y1, x2, y2) {
+            state.ctx.globalCompositeOperation = 'source-over';
+            state.ctx.lineWidth = penConfig.currentSize;
+            state.ctx.strokeStyle = penConfig.currentColor;
+            state.ctx.lineCap = 'round';
+            state.ctx.lineJoin = 'round';
+
+            state.ctx.beginPath();
+            state.ctx.moveTo(x1, y1);
+            state.ctx.lineTo(x2, y2);
+            state.ctx.stroke();
+        }
+
+        function drawCircle(centerX, centerY, radius) {
+            state.ctx.globalCompositeOperation = 'source-over';
+            state.ctx.lineWidth = penConfig.currentSize;
+            state.ctx.strokeStyle = penConfig.currentColor;
+            state.ctx.lineCap = 'round';
+            state.ctx.lineJoin = 'round';
+
+            state.ctx.beginPath();
+            state.ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            state.ctx.stroke();
+        }
+
+        function handleResize() {
+            if (!state.canvas) return;
+
+            const dpr = window.devicePixelRatio || 1;
+            const rect = container.getBoundingClientRect();
+
+            const oldWidth = parseFloat(state.canvas.style.width) || state.canvas.width / state.dpr;
+            const oldHeight = parseFloat(state.canvas.style.height) || state.canvas.height / state.dpr;
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = oldWidth;
+            tempCanvas.height = oldHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(state.canvas, 0, 0, oldWidth, oldHeight);
+
+            state.canvas.width = rect.width * dpr;
+            state.canvas.height = rect.height * dpr;
+            state.canvas.style.width = rect.width + 'px';
+            state.canvas.style.height = rect.height + 'px';
+
+            state.ctx.scale(dpr, dpr);
+            state.ctx.drawImage(tempCanvas, 0, 0, rect.width, rect.height);
+
+            state.ctx.lineCap = 'round';
+            state.ctx.lineJoin = 'round';
+            state.ctx.imageSmoothingEnabled = true;
+            state.ctx.imageSmoothingQuality = 'high';
+
+            state.dpr = dpr;
+
+            // 更新网格canvas大小
+            gridCanvas.width = rect.width * dpr;
+            gridCanvas.height = rect.height * dpr;
+            gridCanvas.style.width = rect.width + 'px';
+            gridCanvas.style.height = rect.height + 'px';
+            if (state.gridCtx) {
+                state.gridCtx.scale(dpr, dpr);
+                updateGridCanvas();
+            }
+
+            saveCurrentPage();
+        }
+        ////////////////////////////////////////////////
+        // --- 优化的绘制逻辑 ---
+function startDrawing(e) {
+    state.isDrawing = true;
+    // 不要在这里立即 pushHistory，延迟到确定需要保存时
+    const { x, y } = getCoordinates(e);
+
+    state.currentStrokePoints = [{x, y}];
+    state.pendingPoints = [{x, y}];
+    state.lastX = x;
+    state.lastY = y;
+
+    // 立即绘制起点
+    state.ctx.beginPath();
+    state.ctx.moveTo(x, y);
+    state.ctx.lineTo(x, y);
+    state.ctx.stroke();
+
+    if (!state.isDrawingFrame) {
+        state.isDrawingFrame = true;
+        requestAnimationFrame(drawFrame);
+    }
+}
+
+function stopDrawing() {
+    if (!state.isDrawing) return;
+    state.isDrawing = false;
+    state.pendingPoints = [];
+    state.lastX = null;
+    state.lastY = null;
+    state.ctx.closePath();
+    state.ctx.beginPath();
+
+    if (state.tool === 'pen' && state.currentStrokePoints.length > 1) {
+        // 先分析是否需要自动替换
+        const converted = analyzeAndConvertStroke(state.currentStrokePoints);
+        // 只有没有被自动替换的笔画才保存历史
+        if (!converted) {
+            pushHistory();
+        }
+    }
+
+    state.currentStrokePoints = [];
+}
+
+// --- 触摸事件也需要相应修改 ---
+function handleTouchStart(e) {
+    e.preventDefault();
+    const rect = state.canvas.getBoundingClientRect();
+
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const touchId = touch.identifier;
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+
+        state.activeTouches.set(touchId, {
+            lastX: x,
+            lastY: y,
+            isDrawing: true,
+            points: [{x, y}],
+            pendingPoints: [{x, y}],
+            historyPushed: false  // 标记是否已保存历史
+        });
+
+        // 移除这里的 pushHistory 调用
+
+        state.ctx.beginPath();
+        state.ctx.moveTo(x, y);
+        state.ctx.lineTo(x, y);
+        state.ctx.stroke();
+    }
+}
+
+function handleTouchEnd(e) {
+    e.preventDefault();
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const touchId = touch.identifier;
+        const touchState = state.activeTouches.get(touchId);
+
+        if (touchState && touchState.isDrawing && state.tool === 'pen' && touchState.points.length > 1) {
+            const converted = analyzeAndConvertStroke(touchState.points);
+            // 只有没有被自动替换的笔画才保存历史
+            if (!converted && !touchState.historyPushed) {
+                pushHistory();
+            }
+        }
+
+        state.activeTouches.delete(touch.identifier);
+    }
+}
+
+// 修改 analyzeAndConvertStroke 返回是否成功替换
+function analyzeAndConvertStroke(points) {
+    if (!state.autoCorrectionEnabled) return false;
+    if (points.length < 3) return false;
+
+    const start = points[0];
+    const end = points[points.length - 1];
+    const length = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
+
+    // 仅在笔画足够长时考虑直线替换
+    if (length > 160) {
+        const isLine = isCloseToLine(points, 15);
+        if (isLine) {
+            // 清除刚才手绘的内容（不经过历史记录）
+            state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+            // 重绘之前的内容
+            redrawPreviousContent();
+            // 绘制直线
+            drawLine(start.x, start.y, end.x, end.y);
+            // 保存新状态到历史
+            pushHistory();
+            return true;
+        }
+    }
+
+    const circle = fitCircle(points);
+    // 圆半径必须大于阈值才替换
+    if (circle && circle.radius > 120) {
+        const isCircle = isCloseToCircle(points, circle, 80);
+        if (isCircle) {
+            // 清除刚才手绘的内容（不经过历史记录）
+            state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+            // 重绘之前的内容
+            redrawPreviousContent();
+            // 绘制圆形
+            drawCircle(circle.centerX, circle.centerY, circle.radius);
+            // 保存新状态到历史
+            pushHistory();
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// 新增：重绘之前历史中的内容
+function redrawPreviousContent() {
+    if (state.historyStep >= 0 && state.history.length > 0) {
+        const imageData = state.history[state.historyStep];
+        state.ctx.putImageData(imageData, 0, 0);
+    }
+}
+
+        init();
+    </script>
+
+    <div class="fixed bottom-3 left-4 text-white/50 text-sm z-50">   26w07a-测试版</div>
+
+</body>
+</html>
