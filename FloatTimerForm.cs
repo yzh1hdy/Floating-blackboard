@@ -119,7 +119,7 @@ namespace _01
             trayIcon = new NotifyIcon
             {
                 Icon = SystemIcons.Application,
-                Text = "F.T.F-期末倒计时",
+                Text = "blackboard",
                 Visible = true
             };
             var menu = new ContextMenuStrip();
