@@ -1,11 +1,10 @@
-﻿using CefSharp;
-using CefSharp.WinForms;
+﻿using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
 using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
-using System.Runtime.ConstrainedExecution;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -16,7 +15,7 @@ namespace _01
         private readonly string imgExpand;
         private readonly string imgCollapse;
 
-        private ChromiumWebBrowser browser;
+        private WebView2 webView;
         private Form webLayer;
         private NotifyIcon trayIcon;
         private PictureBox btnToggle;
@@ -27,7 +26,7 @@ namespace _01
         private readonly Size btnSize;
 
         private readonly System.Windows.Forms.Timer topMostTimer;
-        private bool _cefInitialized = false;
+        private CoreWebView2Environment _webViewEnvironment;
 
         public FloatTimerForm()
         {
@@ -100,11 +99,11 @@ namespace _01
             btnForm.Show();
             #endregion
 
-            #region 4. 初始化 CefSharp 环境
-            InitializeCefSharp();
+            #region 4. 预初始化WebView2环境
+            _ = InitializeWebViewEnvironmentAsync();
             #endregion
 
-            #region 5. 定时置顶
+            #region 5. 置顶定时器
             topMostTimer = new System.Windows.Forms.Timer { Interval = 50 };
             topMostTimer.Tick += (_, _) =>
             {
@@ -115,59 +114,96 @@ namespace _01
             topMostTimer.Start();
             #endregion
 
-            #region 托盘
+            #region 托盘菜单
             trayIcon = new NotifyIcon
             {
                 Icon = SystemIcons.Application,
-                Text = "blackboard",
+                Text = "F.T.F-白板",
                 Visible = true
             };
             var menu = new ContextMenuStrip();
             menu.Items.Add("-");
-            menu.Items.Add("刷新网页", null, (_, _) => RefreshWebPage());
+
+            // 重启程序按钮
+            menu.Items.Add("重启程序", null, (_, _) => RestartApplication());
             menu.Items.Add("-");
+
             menu.Items.Add("退出程序", null, (_, _) => { trayIcon.Visible = false; Application.Exit(); });
             menu.Items.Add("-");
             trayIcon.ContextMenuStrip = menu;
             #endregion
         }
 
-        #region CefSharp 初始化（CefSharp 131 版本）
-        private void InitializeCefSharp()
+        #region WebView2环境预初始化
+        private async Task InitializeWebViewEnvironmentAsync()
         {
-            if (Cef.IsInitialized.GetValueOrDefault())
-            {
-                _cefInitialized = true;
-                return;
-            }
-
             try
             {
-                var settings = new CefSettings
+                var options = new CoreWebView2EnvironmentOptions
                 {
-                    Locale = "zh-CN",
-                    CachePath = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "FloatTimerCefCache"
-                    )
+                    AdditionalBrowserArguments =
+                        "--enable-gpu-rasterization " +
+                        "--enable-zero-copy " +
+                        "--enable-features=VaapiVideoDecoder,VaapiVideoEncoder,CanvasOopRasterization,EnableDrDc " +
+                        "--disable-features=site-per-process,TranslateUI " +
+                        "--max_old_space_size=4096 " +
+                        "--enable-webgl " +
+                        "--ignore-gpu-blocklist " +
+                        "--enable-hardware-overlays " +
+                        "--enable-oop-rasterization " +
+                        "--num-raster-threads=4 " +
+                        "--enable-features=RawDraw " +
+                        "--disable-background-timer-throttling " +
+                        "--disable-backgrounding-occluded-windows " +
+                        "--disable-renderer-backgrounding " +
+                        "--enable-features=HighEfficiencyModeAvailable " +
+                        "--force-color-profile=srgb",
+                    AllowSingleSignOnUsingOSPrimaryAccount = false,
+                    Language = "zh-CN"
                 };
 
-                // 命令行参数
-                settings.CefCommandLineArgs.Add("disable-features", "site-per-process,TranslateUI");
-                settings.CefCommandLineArgs.Add("enable-gpu-rasterization", "1");
+                string userDataFolder = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "FloatTimerWebView2"
+                );
 
-                Cef.Initialize(settings);
-                _cefInitialized = true;
+                _webViewEnvironment = await CoreWebView2Environment.CreateAsync(
+                    browserExecutableFolder: null,
+                    userDataFolder: userDataFolder,
+                    options: options
+                );
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"CefSharp 初始化失败: {ex.Message}");
-                _cefInitialized = false;
+                Debug.WriteLine($"WebView2环境初始化失败: {ex.Message}");
             }
         }
         #endregion
 
-        #region 创建/显示网页层（CefSharp 131 版本）
+        #region 重启程序
+        private void RestartApplication()
+        {
+            try
+            {
+                string exePath = Application.ExecutablePath;
+                ProcessStartInfo startInfo = new ProcessStartInfo
+                {
+                    FileName = exePath,
+                    UseShellExecute = true
+                };
+                Process.Start(startInfo);
+                trayIcon.Visible = false;
+                Application.Exit();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"重启失败: {ex.Message}", "错误",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        #endregion
+
+        #region 创建/销毁WebLayer
         private void CreateWebLayer()
         {
             if (webLayer != null && !webLayer.IsDisposed) return;
@@ -185,43 +221,64 @@ namespace _01
             };
             SetToolWindow(webLayer.Handle);
 
-            // 创建 ChromiumWebBrowser
-            string htmlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "01.html");
+            // 设置窗口分层样式以支持透明
+            SetWindowLong(webLayer.Handle, GWL_EXSTYLE,
+                GetWindowLong(webLayer.Handle, GWL_EXSTYLE) | WS_EX_LAYERED);
 
-            browser = new ChromiumWebBrowser(htmlPath)
+            // 创建 WebView2 控件
+            webView = new WebView2
             {
-                Dock = DockStyle.Fill
+                Dock = DockStyle.Fill,
+                Visible = true,
+                TabStop = false,
+                // 设置默认背景色为透明
+                DefaultBackgroundColor = Color.Transparent
             };
 
-            // 禁用右键菜单（CefSharp 131 方式）
-            browser.MenuHandler = new CustomMenuHandler();
+            webLayer.Controls.Add(webView);
+            webView.CoreWebView2InitializationCompleted += OnCoreReady;
 
-            webLayer.Controls.Add(browser);
+            // 初始化 WebView2
+            if (_webViewEnvironment != null)
+            {
+                _ = webView.EnsureCoreWebView2Async(_webViewEnvironment);
+            }
+            else
+            {
+                _ = webView.EnsureCoreWebView2Async();
+            }
         }
 
-        // 自定义菜单处理器（CefSharp 131 兼容版本）
-        private class CustomMenuHandler : IContextMenuHandler
+        private void DisposeWebLayer()
         {
-            public void OnBeforeContextMenu(IWebBrowser chromiumWebBrowser, IBrowser browser, IFrame frame, IContextMenuParams parameters, IMenuModel model)
+            if (webLayer != null)
             {
-                model.Clear();
-            }
-
-            public bool OnContextMenuCommand(IWebBrowser chromiumWebBrowser, IBrowser browser, IFrame frame, IContextMenuParams parameters, CefMenuCommand commandId, CefEventFlags eventFlags)
-            {
-                return false;
-            }
-
-            public void OnContextMenuDismissed(IWebBrowser chromiumWebBrowser, IBrowser browser, IFrame frame)
-            {
-            }
-
-            public bool RunContextMenu(IWebBrowser chromiumWebBrowser, IBrowser browser, IFrame frame, IContextMenuParams parameters, IMenuModel model, IRunContextMenuCallback callback)
-            {
-                return false;
+                webLayer.Hide();
+                webLayer.Dispose();
+                webLayer = null;
+                webView = null;
             }
         }
         #endregion
+
+        private void OnCoreReady(object? sender, CoreWebView2InitializationCompletedEventArgs e)
+        {
+            if (!e.IsSuccess) return;
+
+            var s = webView.CoreWebView2.Settings;
+
+            s.IsZoomControlEnabled = false;
+            s.IsPinchZoomEnabled = false;
+            s.AreBrowserAcceleratorKeysEnabled = false;
+            s.AreDefaultScriptDialogsEnabled = false;
+            s.IsSwipeNavigationEnabled = false;
+            s.IsReputationCheckingRequired = false;
+
+            webView.CoreWebView2.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Dark;
+
+            string htmlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "01.html");
+            webView.CoreWebView2.Navigate(htmlPath);
+        }
 
         private void Toggle()
         {
@@ -239,16 +296,6 @@ namespace _01
                 webLayer?.Hide();
             }
         }
-
-        #region 刷新网页
-        private void RefreshWebPage()
-        {
-            if (browser != null)
-            {
-                browser.Reload();
-            }
-        }
-        #endregion
 
         #region PNG转Region 镂空
         private static void SetButtonRegion(Form form, Bitmap bmp)
@@ -272,7 +319,7 @@ namespace _01
         }
         #endregion
 
-        #region Win32 API
+        #region Win32
         private const int HWND_TOPMOST = -1;
         private const int SWP_NOMOVE = 0x0002;
         private const int SWP_NOSIZE = 0x0001;
@@ -301,33 +348,5 @@ namespace _01
         #endregion
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData) => true;
-
-        #region 清理资源
-        protected override void OnFormClosing(FormClosingEventArgs e)
-        {
-            base.OnFormClosing(e);
-
-            topMostTimer?.Stop();
-            topMostTimer?.Dispose();
-
-            trayIcon?.Dispose();
-
-            if (browser != null)
-            {
-                browser.Dispose();
-                browser = null;
-            }
-
-            if (webLayer != null && !webLayer.IsDisposed)
-            {
-                webLayer.Dispose();
-            }
-
-            if (btnForm != null && !btnForm.IsDisposed)
-            {
-                btnForm.Dispose();
-            }
-        }
-        #endregion
     }
 }

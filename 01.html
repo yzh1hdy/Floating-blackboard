@@ -70,7 +70,7 @@
                 .font-bold{font-weight:700}
                 .text-white{--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity))}
                 .text-gray-200{--tw-text-opacity:1;color:rgb(229 231 235/var(--tw-text-opacity))}
-                .text-gray-300{--tw-text-opacity:1;color:rgb(209 213 219/var(--tw-text-opacity))}
+                .text-gray-300{--text-opacity:1;color:rgb(209 213 219/var(--tw-text-opacity))}
                 .text-white\/50{color:rgba(255,255,255,0.5)}
                 .text-white\/60{color:rgba(255,255,255,0.6)}
                 .text-white\/70{color:rgba(255,255,255,0.7)}
@@ -92,25 +92,47 @@
         })();
     </script>
     <style>
-        @font-face {
-            font-family: 'HarmonyOS Sans SC';
-            src: url('Medium.ttf') format('truetype');
-            font-weight: 500;
-            font-style: normal;
-        }
-
         * {
-            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
 
         body {
             background-color: #0f261e;
             overflow: hidden;
-            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
             margin: 0;
             padding: 0;
             width: 100vw;
             height: 100vh;
+        }
+
+        /* 透明背景模式 */
+        body.transparent-mode {
+            background-color: transparent !important;
+        }
+
+        body.transparent-mode #canvas-container {
+            background-color: transparent !important;
+        }
+
+        /* 透明模式下所有弹出菜单的背景调整为半透明 */
+        body.transparent-mode .pen-menu,
+        body.transparent-mode .more-menu,
+        body.transparent-mode .video-menu {
+            background: rgba(15, 38, 30, 0.85);
+            backdrop-filter: blur(12px);
+        }
+
+        /* 透明模式下工具栏和导航按钮完全透明背景 */
+        body.transparent-mode .toolbar,
+        body.transparent-mode .fixed.bottom-3 {
+            background: transparent !important;
+            backdrop-filter: none;
+        }
+
+        /* 透明模式下按钮悬停效果 */
+        body.transparent-mode .nav-btn:hover:not(:disabled) {
+            background: rgba(255,255,255,0.15);
         }
 
         .cursor-pen { cursor: crosshair; }
@@ -129,8 +151,9 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: none;
+            transition: all 0.2s;
             cursor: pointer;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
         .nav-btn:disabled { 
             opacity: 0.15; 
@@ -138,9 +161,9 @@
             border-color: rgba(255,255,255,0.1);
         }
         .nav-btn:hover:not(:disabled) {
-            background: transparent;
-            color: rgba(255,255,255,0.6);
-            border-color: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.9);
+            border-color: rgba(255,255,255,0.3);
         }
 
         .toolbar {
@@ -155,10 +178,11 @@
             border: none;
             box-shadow: none;
             gap: 0;
+            transition: all 0.3s ease;
         }
 
         .tool-btn {
-            width: 64px;
+            width: 56px;
             height: 56px;
             border: none;
             background: transparent;
@@ -167,10 +191,17 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            /* 移除按下缩小效果 */
+            transition: none;
+        }
+
+        /* 移除 tool-btn 的 active 缩小效果 */
+        .tool-btn:active {
+            transform: none;
         }
 
         .tool-btn img {
-            width: 64px;
+            width: 56px;
             height: 56px;
             pointer-events: none;
             user-select: none;
@@ -201,6 +232,11 @@
             flex-direction: column;
         }
 
+        /* 透明模式下抽奖结果背景也调整为半透明 */
+        body.transparent-mode .number-result {
+            background: rgba(0,0,0,0.3);
+        }
+
         .result-number {
             font-size: 8rem;
             font-weight: 500;
@@ -208,7 +244,7 @@
             text-shadow: 0 0 8px rgba(255,230,150,.7),
                         0 0 14px rgba(255,230,150,.4);
             animation: numberAppear 0.5s ease-out;
-            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
 
         @keyframes numberAppear {
@@ -222,7 +258,7 @@
             color: rgba(255,255,255,.7);
             letter-spacing: 1px;
             pointer-events: none;
-            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
 
         .result-close-layer {
@@ -251,6 +287,8 @@
             z-index: 60;
             min-width: 220px;
             animation: menuPopIn 0.2s ease-out;
+            transition: background 0.3s ease;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
 
         .pen-menu.show {
@@ -270,6 +308,7 @@
             border-bottom: 1px solid rgba(255,255,255,0.15);
             padding-bottom: 12px;
             font-weight: 500;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
 
         .pen-menu-close {
@@ -303,6 +342,7 @@
             font-size: 12px;
             margin-bottom: 10px;
             display: block;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
 
         .color-palette {
@@ -408,6 +448,7 @@
         .grid-toggle-label {
             color: rgba(255,255,255,0.9);
             font-size: 13px;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
 
         .grid-toggle-switch {
@@ -496,7 +537,7 @@
             color: #333333;
             font-size: 1.2rem;
             font-weight: 500;
-            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
             text-align: center;
         }
 
@@ -517,7 +558,7 @@
             font-weight: 500;
             cursor: pointer;
             transition: none;
-            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
 
         .confirm-btn-cancel {
@@ -551,8 +592,10 @@
             border-radius: 12px;
             padding: 16px;
             z-index: 60;
-            min-width: 160px;
+            min-width: 200px;
             animation: menuPopIn 0.2s ease-out;
+            transition: background 0.3s ease;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
 
         .more-menu.show {
@@ -567,6 +610,7 @@
             border-bottom: 1px solid rgba(255,255,255,0.15);
             padding-bottom: 10px;
             font-weight: 500;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
 
         .more-menu-grid {
@@ -588,6 +632,7 @@
             transition: all 0.2s;
             color: rgba(255,255,255,0.9);
             gap: 6px;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
 
         .more-menu-btn:hover {
@@ -602,6 +647,7 @@
 
         .more-menu-btn span {
             font-size: 12px;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
 
         /* 关于对话框 - 使用清除弹窗样式但无顶部红色条 */
@@ -645,7 +691,7 @@
             color: #333333;
             font-size: 1.2rem;
             font-weight: 500;
-            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
             text-align: center;
         }
 
@@ -661,19 +707,181 @@
             font-weight: 500;
             cursor: pointer;
             transition: none;
-            font-family: 'HarmonyOS Sans SC', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
             background-color: #ffef01;
             color: #333333;
+        }
+
+        /* 视频背景菜单样式 */
+        .video-menu {
+            display: none;
+            position: absolute;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(55, 95, 85, 0.98);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 12px;
+            padding: 16px;
+            z-index: 60;
+            min-width: 200px;
+            animation: menuPopIn 0.2s ease-out;
+            transition: background 0.3s ease;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+
+        .video-menu.show {
+            display: block;
+        }
+
+        .video-menu-header {
+            color: rgba(255,255,255,0.95);
+            font-size: 14px;
+            margin-bottom: 12px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+            padding-bottom: 10px;
+            font-weight: 500;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+
+        .video-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding: 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .video-toggle:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .video-toggle-label {
+            color: rgba(255,255,255,0.9);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+
+        .video-toggle-switch {
+            width: 44px;
+            height: 24px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .video-toggle-switch.active {
+            background: #00c881;
+        }
+
+        .video-toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .video-toggle-switch.active::after {
+            left: 22px;
+        }
+
+        .video-status {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.7);
+            text-align: center;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+
+        /* 视频背景元素 - 最底层 */
+        #video-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            z-index: 1;
+            display: none;
+        }
+
+        #video-background.active {
+            display: block;
+        }
+
+        /* Canvas容器 - 中间层 (z-index: 10) */
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10;
+            background-color: #0f261e;
+            transition: background-color 0.3s ease;
+        }
+
+        /* 视频激活时画布容器背景变透明 */
+        body.video-active #canvas-container {
+            background-color: transparent;
+        }
+
+        /* 主画布 - 透明背景 */
+        #main-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+            background-color: transparent;
+        }
+
+        /* 网格画布 */
+        #grid-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* 确保UI元素在顶层 */
+        .toolbar, .fixed.bottom-3 {
+            z-index: 100;
+        }
+
+        /* 版本号文字在透明模式下增加阴影提高可读性 */
+        body.transparent-mode .fixed.bottom-3.left-4 {
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
         }
     </style>
 <base target="_blank">
 </head>
 <body class="text-gray-200 select-none">
 
-    <!-- Canvas Container -->
+    <!-- 视频背景元素 - 最底层 (z-index: 1) -->
+    <video id="video-background" autoplay playsinline muted></video>
+
+    <!-- Canvas Container - 中间层 (z-index: 10) -->
     <div id="canvas-container" class="cursor-pen w-full h-full fixed inset-0"></div>
 
-    <!-- Grid Canvas -->
+    <!-- Grid Canvas - 在画布之上但在UI之下 -->
     <canvas id="grid-canvas"></canvas>
 
     <!-- Bottom Right: Clean Page Navigation -->
@@ -726,14 +934,8 @@
                     </div>
                 </div>
 
-                <!-- 网格线开关 -->
-                <div class="grid-section">
+                <!-- 网格线开关已删除 -->
 
-                    <div class="grid-toggle" onclick="toggleGrid()">
-                        <span class="grid-toggle-label">显示网格线</span>
-                        <div class="grid-toggle-switch" id="gridToggleSwitch"></div>
-                    </div>
-                </div>
 
                 <!-- 自动校正开关 -->
                 <div class="grid-section">
@@ -782,6 +984,19 @@
                         </svg>
                         <span>虚线</span>
                     </button>
+                    <button class="more-menu-btn" onclick="toggleTransparentMode()" title="透明模式">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        <span id="transparentModeText">透明模式</span>
+                    </button>
+                    <button class="more-menu-btn" onclick="showVideoMenuFromMore()" title="视频背景">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                        </svg>
+                        <span>视频背景</span>
+                    </button>
                     <button class="more-menu-btn" onclick="showAbout()" title="关于">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10" />
@@ -791,6 +1006,21 @@
                         <span>关于</span>
                     </button>
                 </div>
+            </div>
+            <!-- 视频背景菜单（从更多菜单打开） -->
+            <div id="videoMenu" class="video-menu" onclick="event.stopPropagation()">
+                <div class="video-menu-header">视频背景设置</div>
+                <div class="video-toggle" onclick="toggleVideoBackground()">
+                    <span class="video-toggle-label">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                        </svg>
+                        展台模式
+                    </span>
+                    <div class="video-toggle-switch" id="videoToggleSwitch"></div>
+                </div>
+                <div class="video-status" id="videoStatus">摄像头已关闭</div>
             </div>
         </div>
 
@@ -850,8 +1080,8 @@
             <div class="confirm-modal-top-bar"></div>
             <div class="confirm-modal-content">
                 <div class="confirm-bar-text">
-                    Interactive Blackboard<br>
-                    26w12a_最后更新：2026/03/14
+                    Interactive Blackboard 26w14a _ 此项目已在GitHub上开源:<br>
+                    <a href="https://github.com/yzh1hdy/Floating-blackboard" target="_blank">https://github.com/yzh1hdy/Floating-blackboard</a>
                 </div>
                 <div class="confirm-bar-buttons">
                     <button onclick="closeAbout()" class="confirm-btn confirm-btn-cancel">确定</button>
@@ -895,6 +1125,7 @@
             eraserRadius: 15,
             penMenuOpen: false,
             moreMenuOpen: false,
+            videoMenuOpen: false,
             activeTouches: new Map(),
             canvas: null,
             ctx: null,
@@ -919,16 +1150,28 @@
             shapeMode: null, // 'circle', 'line', 'dashed'
             shapeStartPoint: null,
             shapePreviewCanvas: null,
-            shapePreviewCtx: null
+            shapePreviewCtx: null,
+            // 视频背景状态
+            videoBackgroundEnabled: false,
+            videoStream: null,
+            // 透明背景模式
+            transparentMode: false
         };
 
         // --- 抽学号配置 ---
-        const numberList = [
-            '01', '02', '03', '05', '06', '07', '08', '09', '10', '11',
-            '12', '14', '16', '17', '18', '19', '20', '21', '22', '23',
-            '24', '25', '26', '27', '28', '29', '31', '33', '34', '35',
-            '37', '39'
-        ];
+        // 毫秒前两位(0-99)到学号的映射表（来自工作簿1.xlsx）
+        const msToStudentMap = {
+            0: '21', 1: '01', 2: '01', 3: '02', 4: '02', 5: '03', 6: '03', 7: '05', 8: '05', 9: '06',
+            10: '06', 11: '07', 12: '07', 13: '08', 14: '08', 15: '09', 16: '09', 17: '10', 18: '10', 19: '12',
+            20: '12', 21: '16', 22: '16', 23: '17', 24: '17', 25: '18', 26: '18', 27: '19', 28: '19', 29: '20',
+            30: '20', 31: '21', 32: '21', 33: '22', 34: '22', 35: '23', 36: '23', 37: '24', 38: '24', 39: '25',
+            40: '25', 41: '26', 42: '26', 43: '27', 44: '27', 45: '28', 46: '28', 47: '29', 48: '29', 49: '31',
+            50: '31', 51: '33', 52: '33', 53: '34', 54: '34', 55: '35', 56: '35', 57: '37', 58: '37', 59: '39',
+            60: '39', 61: '01', 62: '33', 63: '02', 64: '37', 65: '03', 66: '21', 67: '05', 68: '25', 69: '06',
+            70: '23', 71: '07', 72: '23', 73: '08', 74: '09', 75: '10', 76: '12', 77: '16', 78: '17', 79: '18',
+            80: '19', 81: '20', 82: '21', 83: '22', 84: '23', 85: '24', 86: '25', 87: '26', 88: '27', 89: '28',
+            90: '29', 91: '31', 92: '33', 93: '34', 94: '35', 95: '37', 96: '39', 97: '21', 98: '24', 99: '25'
+        };
 
         // --- DOM Elements ---
         const container = document.getElementById('canvas-container');
@@ -937,8 +1180,10 @@
         const perfWarningBar = document.getElementById('perfWarningBar');
         const penMenu = document.getElementById('penMenu');
         const moreMenu = document.getElementById('moreMenu');
+        const videoMenu = document.getElementById('videoMenu');
         const aboutDialog = document.getElementById('aboutDialog');
         const gridCanvas = document.getElementById('grid-canvas');
+        const videoBackground = document.getElementById('video-background');
 
         const icons = {
             pen: { btn: document.getElementById('tool-pen'), img: document.getElementById('img-pen'), released: '笔-松开.png', pressed: '笔-按下.png' },
@@ -962,20 +1207,29 @@
 
             document.addEventListener('contextmenu', e => e.preventDefault());
 
+            // 修改：添加鼠标悬停和按下事件处理
             Object.keys(icons).forEach(key => {
                 const item = icons[key];
-                item.btn.addEventListener('mousedown', () => item.img.src = item.pressed);
-                item.btn.addEventListener('mouseup', () => {
-                    if (key !== state.tool) item.img.src = item.released;
+                
+                // 鼠标悬停时显示按下状态图标
+                item.btn.addEventListener('mouseenter', () => {
+                    item.img.src = item.pressed;
                 });
+                
+                // 鼠标离开时，如果不是当前选中的工具，恢复松开状态
                 item.btn.addEventListener('mouseleave', () => {
-                    if (key !== state.tool) item.img.src = item.released;
+                    if (key !== state.tool) {
+                        item.img.src = item.released;
+                    }
+                });
+                
+                // 鼠标按下时也显示按下状态（与悬停一致）
+                item.btn.addEventListener('mousedown', () => {
+                    item.img.src = item.pressed;
                 });
             });
 
             document.getElementById('resultCloseLayer').addEventListener('click', closeLottery);
-
-
 
             document.getElementById('prevPageBtn').addEventListener('click', () => goToPage(state.currentPage - 1));
             document.getElementById('nextPageBtn').addEventListener('click', () => {
@@ -989,6 +1243,109 @@
                     }
                 }
             });
+        }
+
+        // --- 透明模式切换功能 ---
+        function toggleTransparentMode() {
+            state.transparentMode = !state.transparentMode;
+            
+            if (state.transparentMode) {
+                enableTransparentMode();
+            } else {
+                disableTransparentMode();
+            }
+            
+            // 更新菜单按钮文本
+            const textEl = document.getElementById('transparentModeText');
+            if (textEl) {
+                textEl.textContent = state.transparentMode ? '退出透明' : '透明模式';
+            }
+            
+            // 关闭更多菜单
+            closeMoreMenu();
+        }
+
+        // --- 启用透明模式 ---
+        function enableTransparentMode() {
+            document.body.classList.add('transparent-mode');
+            document.body.style.backgroundColor = 'transparent';
+            console.log('透明背景模式已启用');
+        }
+
+        // --- 禁用透明模式 ---
+        function disableTransparentMode() {
+            document.body.classList.remove('transparent-mode');
+            document.body.style.backgroundColor = '#0f261e';
+            console.log('透明背景模式已禁用');
+        }
+
+        // --- 视频背景功能（从更多菜单打开）---
+        function showVideoMenuFromMore() {
+            closeMoreMenu();
+            openVideoMenu();
+        }
+
+        function openVideoMenu() {
+            closePenMenu();
+            state.videoMenuOpen = true;
+            videoMenu.classList.add('show');
+        }
+
+        function closeVideoMenu() {
+            state.videoMenuOpen = false;
+            videoMenu.classList.remove('show');
+        }
+
+        async function toggleVideoBackground() {
+            const switchEl = document.getElementById('videoToggleSwitch');
+            const statusEl = document.getElementById('videoStatus');
+
+            if (!state.videoBackgroundEnabled) {
+                // 开启摄像头
+                try {
+                    statusEl.textContent = '正在请求摄像头权限...';
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: 'environment',
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 }
+                        },
+                        audio: false 
+                    });
+                    
+                    state.videoStream = stream;
+                    videoBackground.srcObject = stream;
+                    videoBackground.classList.add('active');
+                    document.body.classList.add('video-active');
+                    
+                    state.videoBackgroundEnabled = true;
+                    switchEl.classList.add('active');
+                    statusEl.textContent = '摄像头已开启';
+                    
+                } catch (err) {
+                    console.error('摄像头访问失败:', err);
+                    statusEl.textContent = '无法访问摄像头: ' + err.message;
+                    
+                    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                        statusEl.textContent = '请在系统设置中允许摄像头访问';
+                    }
+                }
+            } else {
+                // 关闭摄像头
+                if (state.videoStream) {
+                    state.videoStream.getTracks().forEach(track => track.stop());
+                    state.videoStream = null;
+                }
+                
+                videoBackground.srcObject = null;
+                videoBackground.classList.remove('active');
+                document.body.classList.remove('video-active');
+                
+                state.videoBackgroundEnabled = false;
+                switchEl.classList.remove('active');
+                statusEl.textContent = '摄像头已关闭';
+            }
         }
 
         // --- 网格线功能 ---
@@ -1056,8 +1413,7 @@
                 drawGrid();
             }
         }
-
-        function toggleAutoCorrection() {
+                function toggleAutoCorrection() {
             state.autoCorrectionEnabled = !state.autoCorrectionEnabled;
             const switchEl = document.getElementById('autoCorrectionSwitch');
             if (state.autoCorrectionEnabled) {
@@ -1119,6 +1475,7 @@
 
         function openPenMenu() {
             closeMoreMenu(); // 先关闭更多菜单
+            closeVideoMenu(); // 关闭视频菜单
             state.penMenuOpen = true;
             penMenu.classList.add('show');
         }
@@ -1146,10 +1503,16 @@
 
         function openMoreMenu() {
             closePenMenu(); // 先关闭笔设置菜单
+            closeVideoMenu(); // 关闭视频菜单
             state.moreMenuOpen = true;
             moreMenu.classList.add('show');
             if (icons.more && icons.more.img) {
                 icons.more.img.src = icons.more.pressed;
+            }
+            // 更新透明模式按钮文本
+            const textEl = document.getElementById('transparentModeText');
+            if (textEl) {
+                textEl.textContent = state.transparentMode ? '退出透明' : '透明模式';
             }
         }
 
@@ -1164,6 +1527,7 @@
         function closeAllMenus() {
             closePenMenu();
             closeMoreMenu();
+            closeVideoMenu();
         }
 
         // 点击外部关闭菜单
@@ -1175,6 +1539,10 @@
             // 关闭更多菜单
             if (state.moreMenuOpen && !e.target.closest('#btn-more') && !e.target.closest('#moreMenu')) {
                 closeMoreMenu();
+            }
+            // 关闭视频菜单
+            if (state.videoMenuOpen && !e.target.closest('#btn-video') && !e.target.closest('#videoMenu')) {
+                closeVideoMenu();
             }
         });
 
@@ -1510,12 +1878,25 @@
             closeResetAllModal();
         }
 
-        function getRandomNumber() {
-            return numberList[Math.floor(Math.random() * numberList.length)];
+        function getStudentByTime() {
+            // 获取当前时间
+            const now = new Date();
+            const seconds = now.getSeconds(); // 0-59
+            const milliseconds = now.getMilliseconds(); // 0-999
+
+            // 秒数的最后一位（0-9）
+            const secondLastDigit = seconds % 10;
+            // 毫秒的第一位（0-9）
+            const msFirstDigit = Math.floor(milliseconds / 100);
+
+            // 组合成两位数（秒末位 * 10 + 毫秒首位）
+            const lookupKey = secondLastDigit * 10 + msFirstDigit; // 范围0-99
+
+            return msToStudentMap[lookupKey];
         }
 
         function showLottery() {
-            const randomNumber = getRandomNumber();
+            const randomNumber = getStudentByTime();
             document.getElementById('resultNumber').textContent = randomNumber;
             document.getElementById('numberResult').style.display = 'flex';
         }
@@ -1536,11 +1917,12 @@
             canvas.height = rect.height * dpr;
             canvas.style.width = rect.width + 'px';
             canvas.style.height = rect.height + 'px';
-            canvas.style.zIndex = 10;
+            // 关键：设置透明背景
+            canvas.style.backgroundColor = 'transparent';
 
             const ctx = canvas.getContext('2d', { 
                 willReadFrequently: true,
-                alpha: true
+                alpha: true // 启用透明通道
             });
 
             ctx.scale(dpr, dpr);
@@ -1568,8 +1950,6 @@
             state.ctx = ctx;
             state.dpr = dpr;
         }
-
-
 
         function handleMouseMove(e) {
             if (!state.isDrawing) return;
@@ -1640,8 +2020,6 @@
             requestAnimationFrame(drawFrame);
         }
 
-
-
         function getCoordinates(e) {
             const rect = state.canvas.getBoundingClientRect();
             return { 
@@ -1650,81 +2028,78 @@
             };
         }
 
-
-
         function handleTouchMove(e) {
-    e.preventDefault();
-    const rect = state.canvas.getBoundingClientRect();
+            e.preventDefault();
+            const rect = state.canvas.getBoundingClientRect();
 
-    for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        const touchId = touch.identifier;
-        const touchState = state.activeTouches.get(touchId);
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const touchId = touch.identifier;
+                const touchState = state.activeTouches.get(touchId);
 
-        if (!touchState || !touchState.isDrawing) continue;
+                if (!touchState || !touchState.isDrawing) continue;
 
-        const x = touch.clientX - rect.left;
-        const y = touch.clientY - rect.top;
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
 
-        // 图形绘制预览模式
-        if (touchState.isShapeMode && state.shapeMode && state.shapeStartPoint) {
-            drawShapePreview(state.shapeStartPoint.x, state.shapeStartPoint.y, x, y);
-            touchState.lastX = x;
-            touchState.lastY = y;
-            continue;
-        }
+                // 图形绘制预览模式
+                if (touchState.isShapeMode && state.shapeMode && state.shapeStartPoint) {
+                    drawShapePreview(state.shapeStartPoint.x, state.shapeStartPoint.y, x, y);
+                    touchState.lastX = x;
+                    touchState.lastY = y;
+                    continue;
+                }
 
-        touchState.pendingPoints.push({x, y});
+                touchState.pendingPoints.push({x, y});
 
-        // 处理待绘制点
-        if (touchState.pendingPoints.length > 0) {
-            const points = touchState.pendingPoints.splice(0);
+                // 处理待绘制点
+                if (touchState.pendingPoints.length > 0) {
+                    const points = touchState.pendingPoints.splice(0);
 
-            if (state.tool === 'pen') {
-                state.ctx.globalCompositeOperation = 'source-over';
-                state.ctx.lineWidth = penConfig.currentSize;
-                state.ctx.strokeStyle = penConfig.currentColor;
-                state.ctx.lineCap = 'round';
-                state.ctx.lineJoin = 'round';
+                    if (state.tool === 'pen') {
+                        state.ctx.globalCompositeOperation = 'source-over';
+                        state.ctx.lineWidth = penConfig.currentSize;
+                        state.ctx.strokeStyle = penConfig.currentColor;
+                        state.ctx.lineCap = 'round';
+                        state.ctx.lineJoin = 'round';
 
-                state.ctx.beginPath();
-                state.ctx.moveTo(touchState.lastX, touchState.lastY);
+                        state.ctx.beginPath();
+                        state.ctx.moveTo(touchState.lastX, touchState.lastY);
 
-                for (let j = 0; j < points.length; j++) {
-                    const point = points[j];
-                    touchState.points.push(point);
+                        for (let j = 0; j < points.length; j++) {
+                            const point = points[j];
+                            touchState.points.push(point);
 
-                    if (j > 0) {
-                        const prev = points[j - 1];
-                        const midX = (prev.x + point.x) / 2;
-                        const midY = (prev.y + point.y) / 2;
-                        state.ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
+                            if (j > 0) {
+                                const prev = points[j - 1];
+                                const midX = (prev.x + point.x) / 2;
+                                const midY = (prev.y + point.y) / 2;
+                                state.ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
+                            }
+                        }
+
+                        const lastPoint = points[points.length - 1];
+                        state.ctx.lineTo(lastPoint.x, lastPoint.y);
+                        state.ctx.stroke();
+
+                        touchState.lastX = lastPoint.x;
+                        touchState.lastY = lastPoint.y;
+                    } else if (state.tool === 'eraser') {
+                        state.ctx.globalCompositeOperation = 'destination-out';
+
+                        for (const point of points) {
+                            state.ctx.beginPath();
+                            state.ctx.arc(point.x, point.y, state.eraserRadius, 0, Math.PI * 2);
+                            state.ctx.fill();
+                        }
+
+                        const lastPoint = points[points.length - 1];
+                        touchState.lastX = lastPoint.x;
+                        touchState.lastY = lastPoint.y;
                     }
                 }
-
-                const lastPoint = points[points.length - 1];
-                state.ctx.lineTo(lastPoint.x, lastPoint.y);
-                state.ctx.stroke();
-
-                touchState.lastX = lastPoint.x;
-                touchState.lastY = lastPoint.y;
-            } else if (state.tool === 'eraser') {
-                state.ctx.globalCompositeOperation = 'destination-out';
-
-                for (const point of points) {
-                    state.ctx.beginPath();
-                    state.ctx.arc(point.x, point.y, state.eraserRadius, 0, Math.PI * 2);
-                    state.ctx.fill();
-                }
-
-                const lastPoint = points[points.length - 1];
-                touchState.lastX = lastPoint.x;
-                touchState.lastY = lastPoint.y;
             }
         }
-    }
-}
-
 
         function setTool(toolName) {
             // 如果正在图形绘制模式，先退出
@@ -1772,7 +2147,6 @@
 
             state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
             state.circles = []; // 清空圆信息
-                state.lines = []; // 清空直线端点信息（页面切换时重置）
             state.lines = []; // 清空直线端点信息
 
             const bitmap = state.pages[pageIndex];
@@ -1812,7 +2186,7 @@
             state.history = [];
             state.historyStep = -1;
             state.circles = []; // 清空圆信息
-                state.lines = []; // 清空直线端点信息
+            state.lines = []; // 清空直线端点信息
             updateUI();
         }
 
@@ -1878,8 +2252,6 @@
             }
             closeClearModal();
         }
-
-
 
         function isCloseToLine(points, threshold) {
             if (points.length < 2) return false;
@@ -1988,6 +2360,8 @@
             state.canvas.height = rect.height * dpr;
             state.canvas.style.width = rect.width + 'px';
             state.canvas.style.height = rect.height + 'px';
+            // 保持透明背景
+            state.canvas.style.backgroundColor = 'transparent';
 
             state.ctx.scale(dpr, dpr);
             state.ctx.drawImage(tempCanvas, 0, 0, rect.width, rect.height);
@@ -2011,215 +2385,213 @@
 
             saveCurrentPage();
         }
-        ////////////////////////////////////////////////
+
         // --- 优化的绘制逻辑 ---
-function startDrawing(e) {
-    const { x, y } = getCoordinates(e);
-    
-    // 图形绘制模式
-    if (state.shapeMode) {
-        state.shapeStartPoint = { x, y };
-        state.isDrawing = true;
-        return;
-    }
-    
-    state.isDrawing = true;
-    // 不要在这里立即 pushHistory，延迟到确定需要保存时
-    
-    state.currentStrokePoints = [{x, y}];
-    state.pendingPoints = [{x, y}];
-    state.lastX = x;
-    state.lastY = y;
-
-    // 立即绘制起点
-    state.ctx.beginPath();
-    state.ctx.moveTo(x, y);
-    state.ctx.lineTo(x, y);
-    state.ctx.stroke();
-
-    if (!state.isDrawingFrame) {
-        state.isDrawingFrame = true;
-        requestAnimationFrame(drawFrame);
-    }
-}
-
-function stopDrawing(e) {
-    if (!state.isDrawing) return;
-    
-    // 图形绘制模式 - 完成绘制
-    if (state.shapeMode && state.shapeStartPoint && e) {
-        const { x, y } = getCoordinates(e);
-        finishShapeDraw(x, y);
-        state.isDrawing = false;
-        return;
-    }
-    
-    state.isDrawing = false;
-    state.pendingPoints = [];
-    state.lastX = null;
-    state.lastY = null;
-    state.ctx.closePath();
-    state.ctx.beginPath();
-
-    if (state.tool === 'pen' && state.currentStrokePoints.length > 1) {
-        // 先分析是否需要自动替换
-        const converted = analyzeAndConvertStroke(state.currentStrokePoints);
-        // 只有没有被自动替换的笔画才保存历史
-        if (!converted) {
-            pushHistory();
-        }
-    }
-
-    state.currentStrokePoints = [];
-}
-
-// --- 触摸事件也需要相应修改 ---
-function handleTouchStart(e) {
-    e.preventDefault();
-
-    // 关闭所有菜单（笔设置菜单和更多菜单）
-    closeAllMenus();
-
-    const rect = state.canvas.getBoundingClientRect();
-
-    for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        const touchId = touch.identifier;
-        const x = touch.clientX - rect.left;
-        const y = touch.clientY - rect.top;
-
-        // 图形绘制模式处理
-        if (state.shapeMode) {
-            state.shapeStartPoint = { x, y };
+        function startDrawing(e) {
+            const { x, y } = getCoordinates(e);
+            
+            // 图形绘制模式
+            if (state.shapeMode) {
+                state.shapeStartPoint = { x, y };
+                state.isDrawing = true;
+                return;
+            }
+            
             state.isDrawing = true;
-            state.activeTouches.set(touchId, {
-                lastX: x,
-                lastY: y,
-                isDrawing: true,
-                points: [{x, y}],
-                pendingPoints: [{x, y}],
-                historyPushed: false,
-                isShapeMode: true  // 标记为图形绘制模式
-            });
-            return;
-        }
+            
+            state.currentStrokePoints = [{x, y}];
+            state.pendingPoints = [{x, y}];
+            state.lastX = x;
+            state.lastY = y;
 
-        state.activeTouches.set(touchId, {
-            lastX: x,
-            lastY: y,
-            isDrawing: true,
-            points: [{x, y}],
-            pendingPoints: [{x, y}],
-            historyPushed: false
-        });
+            // 立即绘制起点
+            state.ctx.beginPath();
+            state.ctx.moveTo(x, y);
+            state.ctx.lineTo(x, y);
+            state.ctx.stroke();
 
-        state.ctx.beginPath();
-        state.ctx.moveTo(x, y);
-        state.ctx.lineTo(x, y);
-        state.ctx.stroke();
-    }
-}
-
-function handleTouchEnd(e) {
-    e.preventDefault();
-    const rect = state.canvas.getBoundingClientRect();
-
-    for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        const touchId = touch.identifier;
-        const touchState = state.activeTouches.get(touchId);
-
-        if (!touchState) {
-            state.activeTouches.delete(touch.identifier);
-            continue;
-        }
-
-        // 图形绘制模式 - 完成绘制
-        if (touchState.isShapeMode && state.shapeMode && state.shapeStartPoint) {
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
-            finishShapeDraw(x, y);
-            state.isDrawing = false;
-            state.activeTouches.delete(touch.identifier);
-            continue;
-        }
-
-        if (touchState.isDrawing && state.tool === 'pen' && touchState.points.length > 1) {
-            const converted = analyzeAndConvertStroke(touchState.points);
-            // 只有没有被自动替换的笔画才保存历史
-            if (!converted && !touchState.historyPushed) {
-                pushHistory();
+            if (!state.isDrawingFrame) {
+                state.isDrawingFrame = true;
+                requestAnimationFrame(drawFrame);
             }
         }
 
-        state.activeTouches.delete(touch.identifier);
-    }
-}
+        function stopDrawing(e) {
+            if (!state.isDrawing) return;
+            
+            // 图形绘制模式 - 完成绘制
+            if (state.shapeMode && state.shapeStartPoint && e) {
+                const { x, y } = getCoordinates(e);
+                finishShapeDraw(x, y);
+                state.isDrawing = false;
+                return;
+            }
+            
+            state.isDrawing = false;
+            state.pendingPoints = [];
+            state.lastX = null;
+            state.lastY = null;
+            state.ctx.closePath();
+            state.ctx.beginPath();
 
-// 修改 analyzeAndConvertStroke 返回是否成功替换
-function analyzeAndConvertStroke(points) {
-    if (!state.autoCorrectionEnabled) return false;
-    if (points.length < 3) return false;
+            if (state.tool === 'pen' && state.currentStrokePoints.length > 1) {
+                // 先分析是否需要自动替换
+                const converted = analyzeAndConvertStroke(state.currentStrokePoints);
+                // 只有没有被自动替换的笔画才保存历史
+                if (!converted) {
+                    pushHistory();
+                }
+            }
 
-    const start = points[0];
-    const end = points[points.length - 1];
-    const length = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
-
-    // 仅在笔画足够长时考虑直线替换
-    if (length > 160) {
-        const isLine = isCloseToLine(points, 15);
-        if (isLine) {
-            // 清除刚才手绘的内容（不经过历史记录）
-            state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
-            // 重绘之前的内容
-            redrawPreviousContent();
-            // 绘制直线
-            drawLine(start.x, start.y, end.x, end.y);
-            // 保存直线端点信息用于吸附
-            state.lines.push({
-                x1: start.x,
-                y1: start.y,
-                x2: end.x,
-                y2: end.y
-            });
-            // 保存新状态到历史
-            pushHistory();
-            return true;
+            state.currentStrokePoints = [];
         }
-    }
 
-    const circle = fitCircle(points);
-    // 圆半径必须大于阈值才替换
-    if (circle && circle.radius > 120) {
-        const isCircle = isCloseToCircle(points, circle, 80);
-        if (isCircle) {
-            // 清除刚才手绘的内容（不经过历史记录）
-            state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
-            // 重绘之前的内容
-            redrawPreviousContent();
-            // 绘制圆形
-            drawCircle(circle.centerX, circle.centerY, circle.radius);
-            // 保存新状态到历史
-            pushHistory();
-            return true;
+        // --- 触摸事件 ---
+        function handleTouchStart(e) {
+            e.preventDefault();
+
+            // 关闭所有菜单
+            closeAllMenus();
+
+            const rect = state.canvas.getBoundingClientRect();
+
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const touchId = touch.identifier;
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+
+                // 图形绘制模式处理
+                if (state.shapeMode) {
+                    state.shapeStartPoint = { x, y };
+                    state.isDrawing = true;
+                    state.activeTouches.set(touchId, {
+                        lastX: x,
+                        lastY: y,
+                        isDrawing: true,
+                        points: [{x, y}],
+                        pendingPoints: [{x, y}],
+                        historyPushed: false,
+                        isShapeMode: true
+                    });
+                    return;
+                }
+
+                state.activeTouches.set(touchId, {
+                    lastX: x,
+                    lastY: y,
+                    isDrawing: true,
+                    points: [{x, y}],
+                    pendingPoints: [{x, y}],
+                    historyPushed: false
+                });
+
+                state.ctx.beginPath();
+                state.ctx.moveTo(x, y);
+                state.ctx.lineTo(x, y);
+                state.ctx.stroke();
+            }
         }
-    }
-    
-    return false;
-}
 
-// 新增：重绘之前历史中的内容
-function redrawPreviousContent() {
-    if (state.historyStep >= 0 && state.history.length > 0) {
-        const imageData = state.history[state.historyStep];
-        state.ctx.putImageData(imageData, 0, 0);
-    }
-}
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            const rect = state.canvas.getBoundingClientRect();
+
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const touchId = touch.identifier;
+                const touchState = state.activeTouches.get(touchId);
+
+                if (!touchState) {
+                    state.activeTouches.delete(touch.identifier);
+                    continue;
+                }
+
+                // 图形绘制模式 - 完成绘制
+                if (touchState.isShapeMode && state.shapeMode && state.shapeStartPoint) {
+                    const x = touch.clientX - rect.left;
+                    const y = touch.clientY - rect.top;
+                    finishShapeDraw(x, y);
+                    state.isDrawing = false;
+                    state.activeTouches.delete(touch.identifier);
+                    continue;
+                }
+
+                if (touchState.isDrawing && state.tool === 'pen' && touchState.points.length > 1) {
+                    const converted = analyzeAndConvertStroke(touchState.points);
+                    if (!converted && !touchState.historyPushed) {
+                        pushHistory();
+                    }
+                }
+
+                state.activeTouches.delete(touch.identifier);
+            }
+        }
+
+        // 修改 analyzeAndConvertStroke 返回是否成功替换
+        function analyzeAndConvertStroke(points) {
+            if (!state.autoCorrectionEnabled) return false;
+            if (points.length < 3) return false;
+
+            const start = points[0];
+            const end = points[points.length - 1];
+            const length = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
+
+            // 仅在笔画足够长时考虑直线替换
+            if (length > 160) {
+                const isLine = isCloseToLine(points, 15);
+                if (isLine) {
+                    // 清除刚才手绘的内容
+                    state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+                    // 重绘之前的内容
+                    redrawPreviousContent();
+                    // 绘制直线
+                    drawLine(start.x, start.y, end.x, end.y);
+                    // 保存直线端点信息用于吸附
+                    state.lines.push({
+                        x1: start.x,
+                        y1: start.y,
+                        x2: end.x,
+                        y2: end.y
+                    });
+                    // 保存新状态到历史
+                    pushHistory();
+                    return true;
+                }
+            }
+
+            const circle = fitCircle(points);
+            // 圆半径必须大于阈值才替换
+            if (circle && circle.radius > 120) {
+                const isCircle = isCloseToCircle(points, circle, 80);
+                if (isCircle) {
+                    // 清除刚才手绘的内容
+                    state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+                    // 重绘之前的内容
+                    redrawPreviousContent();
+                    // 绘制圆形
+                    drawCircle(circle.centerX, circle.centerY, circle.radius);
+                    // 保存新状态到历史
+                    pushHistory();
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        // 新增：重绘之前历史中的内容
+        function redrawPreviousContent() {
+            if (state.historyStep >= 0 && state.history.length > 0) {
+                const imageData = state.history[state.historyStep];
+                state.ctx.putImageData(imageData, 0, 0);
+            }
+        }
 
         init();
     </script>
 
-    <div class="fixed bottom-3 left-4 text-white/50 text-sm z-50">   26w12a-测试版</div>
+    <div class="fixed bottom-3 left-4 text-white/50 text-sm z-50">   26w14a-测试版</div>
 
 </body>
 </html>
