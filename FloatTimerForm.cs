@@ -28,6 +28,10 @@ namespace _01
         private readonly System.Windows.Forms.Timer topMostTimer;
         private CoreWebView2Environment _webViewEnvironment;
 
+        // 重启标志 - 用于区分正常退出和重启
+        private static bool _isRestarting = false;
+        public static bool IsRestarting => _isRestarting;
+
         public FloatTimerForm()
         {
             #region 1. 主窗口：0x0 + 透明 + 穿透 + ToolWindow
@@ -139,27 +143,16 @@ namespace _01
         {
             try
             {
+                // 检测设备性能，选择适合的配置
+                bool isLowPerformance = IsLowPerformanceDevice();
+
                 var options = new CoreWebView2EnvironmentOptions
                 {
-                    AdditionalBrowserArguments =
-                        "--enable-gpu-rasterization " +
-                        "--enable-zero-copy " +
-                        "--enable-features=VaapiVideoDecoder,VaapiVideoEncoder,CanvasOopRasterization,EnableDrDc " +
-                        "--disable-features=site-per-process,TranslateUI " +
-                        "--max_old_space_size=4096 " +
-                        "--enable-webgl " +
-                        "--ignore-gpu-blocklist " +
-                        "--enable-hardware-overlays " +
-                        "--enable-oop-rasterization " +
-                        "--num-raster-threads=4 " +
-                        "--enable-features=RawDraw " +
-                        "--disable-background-timer-throttling " +
-                        "--disable-backgrounding-occluded-windows " +
-                        "--disable-renderer-backgrounding " +
-                        "--enable-features=HighEfficiencyModeAvailable " +
-                        "--force-color-profile=srgb",
+                    AdditionalBrowserArguments = isLowPerformance
+                        ? GetLowPerformanceArguments()
+                        : GetNormalPerformanceArguments(),
                     AllowSingleSignOnUsingOSPrimaryAccount = false,
-                    Language = "zh-CN"
+                    Language = "zh-CN",
                 };
 
                 string userDataFolder = Path.Combine(
@@ -178,6 +171,100 @@ namespace _01
                 Debug.WriteLine($"WebView2环境初始化失败: {ex.Message}");
             }
         }
+
+        // 检测设备是否为低性能设备
+        private bool IsLowPerformanceDevice()
+        {
+            try
+            {
+                // 获取物理内存大小 (MB)
+                var memoryStatus = new MEMORYSTATUSEX();
+                if (GlobalMemoryStatusEx(memoryStatus))
+                {
+                    ulong totalPhysicalMB = memoryStatus.ullTotalPhys / (1024 * 1024);
+                    // 8GB以下内存视为低性能设备
+                    if (totalPhysicalMB < 8192)
+                        return true;
+                }
+
+                // 获取处理器核心数
+                int processorCount = Environment.ProcessorCount;
+                if (processorCount <= 2)
+                    return true;
+
+                return false;
+            }
+            catch
+            {
+                // 检测失败时默认使用普通配置
+                return false;
+            }
+        }
+
+        // 低性能设备参数 - 禁用GPU加速，减少内存占用
+        private string GetLowPerformanceArguments()
+        {
+            return
+                "--enable-gpu " +
+                "--enable-gpu-compositing " +
+                "--disable-software-rasterizer " +
+                "--disable-features=site-per-process,TranslateUI,CanvasOopRasterization " +
+                "--disable-webgl " +
+                "--disable-background-timer-throttling " +
+                "--disable-backgrounding-occluded-windows " +
+                "--disable-renderer-backgrounding " +
+                "--force-color-profile=srgb " +
+                "--disable-extensions " +
+                "--disable-plugins " +
+                "--disable-sync " +
+                "--disable-default-apps " +
+                "--no-first-run " +
+                "--memory-model=low " +
+                "--disable-dev-shm-usage ";
+        }
+
+        // 普通设备参数 - 适度优化
+        private string GetNormalPerformanceArguments()
+        {
+            return
+                "--enable-gpu-rasterization " +
+                "--enable-features=CanvasOopRasterization " +
+                "--disable-features=site-per-process,TranslateUI " +
+                "--max_old_space_size=3072 " +
+                "--enable-webgl " +
+                "--ignore-gpu-blocklist " +
+                "--disable-background-timer-throttling " +
+                "--disable-backgrounding-occluded-windows " +
+                "--disable-renderer-backgrounding " +
+                "--force-color-profile=srgb " +
+                "--disable-extensions " +
+                "--disable-plugins " +
+                "--disable-sync " +
+                "--no-first-run";
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private class MEMORYSTATUSEX
+        {
+            public uint dwLength;
+            public uint dwMemoryLoad;
+            public ulong ullTotalPhys;
+            public ulong ullAvailPhys;
+            public ulong ullTotalPageFile;
+            public ulong ullAvailPageFile;
+            public ulong ullTotalVirtual;
+            public ulong ullAvailVirtual;
+            public ulong ullAvailExtendedVirtual;
+
+            public MEMORYSTATUSEX()
+            {
+                dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
+            }
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GlobalMemoryStatusEx([In, Out] MEMORYSTATUSEX lpBuffer);
         #endregion
 
         #region 重启程序
@@ -185,14 +272,24 @@ namespace _01
         {
             try
             {
-                string exePath = Application.ExecutablePath;
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = exePath,
-                    UseShellExecute = true
-                };
-                Process.Start(startInfo);
+                // 设置重启标志 - 让Program.cs在退出后启动新进程
+                Program.SetRestartFlag();
+
+                // 隐藏托盘图标
                 trayIcon.Visible = false;
+
+                // 释放WebView资源
+                DisposeWebLayer();
+
+                // 停止定时器
+                topMostTimer?.Stop();
+                topMostTimer?.Dispose();
+
+                // 关闭按钮窗口
+                btnForm?.Close();
+                btnForm?.Dispose();
+
+                // 退出当前程序 - 由Program.cs的finally块启动新进程
                 Application.Exit();
             }
             catch (Exception ex)
@@ -202,6 +299,7 @@ namespace _01
             }
         }
         #endregion
+
 
         #region 创建/销毁WebLayer
         private void CreateWebLayer()
@@ -251,12 +349,25 @@ namespace _01
 
         private void DisposeWebLayer()
         {
+            if (webView != null)
+            {
+                try
+                {
+                    webView.Dispose();
+                }
+                catch { }
+                webView = null;
+            }
+
             if (webLayer != null)
             {
-                webLayer.Hide();
-                webLayer.Dispose();
+                try
+                {
+                    webLayer.Hide();
+                    webLayer.Dispose();
+                }
+                catch { }
                 webLayer = null;
-                webView = null;
             }
         }
         #endregion
@@ -273,6 +384,14 @@ namespace _01
             s.AreDefaultScriptDialogsEnabled = false;
             s.IsSwipeNavigationEnabled = false;
             s.IsReputationCheckingRequired = false;
+
+            // 低性能设备额外优化
+            if (IsLowPerformanceDevice())
+            {
+                s.IsBuiltInErrorPageEnabled = false;
+                s.AreDefaultContextMenusEnabled = false;
+                s.IsStatusBarEnabled = false;
+            }
 
             webView.CoreWebView2.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Dark;
 

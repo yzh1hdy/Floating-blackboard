@@ -119,7 +119,7 @@
         body.transparent-mode .pen-menu,
         body.transparent-mode .more-menu,
         body.transparent-mode .video-menu {
-            background: rgba(15, 38, 30, 0.85);
+            background: url('icon/penset-bg.png') center/cover no-repeat; background-size: 100% 100%;
             backdrop-filter: blur(12px);
         }
 
@@ -132,7 +132,7 @@
 
         /* 透明模式下按钮悬停效果 */
         body.transparent-mode .nav-btn:hover:not(:disabled) {
-            background: rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.08);
         }
 
         .cursor-pen { cursor: crosshair; }
@@ -140,6 +140,25 @@
         .cursor-eraser-active {
             cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.8)" stroke-width="1.5" style="shape-rendering: geometricPrecision;"/></svg>') 20 20, auto;
         }
+        /* 超大橡皮擦模式样式 - 粉色半透明 */
+        .mega-eraser-active {
+            cursor: none !important;
+        }
+
+        /* 超大橡皮擦预览层 */
+        #mega-eraser-preview {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 20;
+            display: none;
+        }
+
+        #mega-eraser-preview.active {
+            display: block;
+        }
+
 
         .nav-btn {
             background: transparent;
@@ -241,10 +260,22 @@
             font-size: 8rem;
             font-weight: 500;
             color: #FFF;
-            text-shadow: 0 0 8px rgba(255,230,150,.7),
-                        0 0 14px rgba(255,230,150,.4);
-            animation: numberAppear 0.5s ease-out;
-            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'segoe ui';
+            position: relative;
+            z-index: 2;
+        }
+
+        .result-number::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -48%);
+            width: 150rem;
+            height: 52%;
+            background-color: #ffc0cb;
+            z-index: -1;
+            border-radius: 0;
         }
 
         @keyframes numberAppear {
@@ -280,8 +311,8 @@
             bottom: 70px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(55, 95, 85, 0.98);
-            border: 1px solid rgba(255,255,255,0.3);
+            background: url('icon/penset-bg.png') center/cover no-repeat; background-size: 100% 100%;
+            border: none;
             border-radius: 12px;
             padding: 20px;
             z-index: 60;
@@ -301,8 +332,8 @@
         }
 
         .pen-menu-header {
-            color: rgba(255,255,255,0.95);
-            font-size: 14px;
+            color: #fff;
+            font-size: 16px;
             margin-bottom: 16px;
             text-align: center;
             border-bottom: 1px solid rgba(255,255,255,0.15);
@@ -315,7 +346,7 @@
             position: absolute;
             top: 8px;
             right: 12px;
-            color: rgba(255,255,255,0.6);
+            color: rgba(0,0,0,0.6);
             cursor: pointer;
             font-size: 20px;
             line-height: 1;
@@ -329,8 +360,8 @@
         }
 
         .pen-menu-close:hover {
-            color: rgba(255,255,255,0.95);
-            background: rgba(255,255,255,0.1);
+            color: rgba(0,0,0,0.95);
+            background: rgba(0,0,0,0.1);
         }
 
         .color-section {
@@ -338,7 +369,7 @@
         }
 
         .section-label {
-            color: rgba(255,255,255,0.8);
+            color: #ffc0cb;
             font-size: 12px;
             margin-bottom: 10px;
             display: block;
@@ -361,13 +392,11 @@
             position: relative;
         }
 
-        .color-btn:hover {
-            transform: scale(1.1);
-        }
+
 
         .color-btn.active {
-            border-color: #00c881;
-            box-shadow: 0 0 0 2px rgba(0, 200, 129, 0.3);
+            border-color: #ffc0cb;
+            box-shadow: 0 0 0 2px rgba(255, 192, 203, 0.5);
         }
 
         .color-btn.active::after {
@@ -376,10 +405,10 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: #00c881;
+            color: #ffc0cb;
             font-size: 16px;
             font-weight: bold;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            text-shadow: 0 1px 2px rgba(255,255,255,0.5);
         }
 
         .size-section {
@@ -407,19 +436,16 @@
             transition: all 0.2s;
         }
 
-        .size-preset-btn:hover {
-            background: rgba(255,255,255,0.2);
-            transform: scale(1.1);
-        }
+
 
         .size-preset-btn.active {
-            background: rgba(0, 200, 129, 0.2);
-            border-color: #00c881;
-            box-shadow: 0 0 0 2px rgba(0, 200, 129, 0.2);
+            background: rgba(255, 192, 203, 0.3);
+            border-color: #ffc0cb;
+            box-shadow: 0 0 0 2px rgba(255, 192, 203, 0.4);
         }
 
         .size-preset-dot {
-            background: rgba(255,255,255,0.9);
+            background: #ffc0cb;
             border-radius: 50%;
         }
 
@@ -442,11 +468,11 @@
         }
 
         .grid-toggle:hover {
-            background: rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.08);
         }
 
         .grid-toggle-label {
-            color: rgba(255,255,255,0.9);
+            color: #ffc0cb;
             font-size: 13px;
             font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
@@ -454,14 +480,14 @@
         .grid-toggle-switch {
             width: 44px;
             height: 24px;
-            background: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.12);
             border-radius: 12px;
             position: relative;
             transition: all 0.3s;
         }
 
         .grid-toggle-switch.active {
-            background: #00c881;
+            background: #ffc0cb;
         }
 
         .grid-toggle-switch::after {
@@ -587,8 +613,8 @@
             bottom: 70px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(55, 95, 85, 0.98);
-            border: 1px solid rgba(255,255,255,0.3);
+            background: url('icon/more-bg.png') center/cover no-repeat; background-size: 100% 100%;
+            border: none;
             border-radius: 12px;
             padding: 16px;
             z-index: 60;
@@ -603,8 +629,8 @@
         }
 
         .more-menu-header {
-            color: rgba(255,255,255,0.95);
-            font-size: 14px;
+            color: #fff;
+            font-size: 16px;
             margin-bottom: 12px;
             text-align: center;
             border-bottom: 1px solid rgba(255,255,255,0.15);
@@ -625,29 +651,30 @@
             align-items: center;
             justify-content: center;
             padding: 12px 8px;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.5);
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.2s;
-            color: rgba(255,255,255,0.9);
+            transition: none;
+            color: #ffc0cb;
             gap: 6px;
             font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
 
         .more-menu-btn:hover {
-            background: rgba(255,255,255,0.2);
-            transform: scale(1.05);
+            background: rgba(255,255,255,0.12);
         }
 
         .more-menu-btn svg {
             width: 24px;
             height: 24px;
+            stroke: #ffc0cb;
         }
 
         .more-menu-btn span {
             font-size: 12px;
             font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            color: #ffc0cb;
         }
 
         /* 关于对话框 - 使用清除弹窗样式但无顶部红色条 */
@@ -719,7 +746,7 @@
             bottom: 70px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(55, 95, 85, 0.98);
+            background: url('icon/penset-bg.png') center/cover no-repeat; background-size: 100% 100%;
             border: 1px solid rgba(255,255,255,0.3);
             border-radius: 12px;
             padding: 16px;
@@ -757,7 +784,7 @@
         }
 
         .video-toggle:hover {
-            background: rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.08);
         }
 
         .video-toggle-label {
@@ -772,14 +799,14 @@
         .video-toggle-switch {
             width: 44px;
             height: 24px;
-            background: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.12);
             border-radius: 12px;
             position: relative;
             transition: all 0.3s;
         }
 
         .video-toggle-switch.active {
-            background: #00c881;
+            background: #ffc0cb;
         }
 
         .video-toggle-switch::after {
@@ -872,6 +899,14 @@
         }
     </style>
 <base target="_blank">
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
 </head>
 <body class="text-gray-200 select-none">
 
@@ -881,12 +916,15 @@
     <!-- Canvas Container - 中间层 (z-index: 10) -->
     <div id="canvas-container" class="cursor-pen w-full h-full fixed inset-0"></div>
 
+    <!-- 超大橡皮擦预览层 - z-index: 20 -->
+    <canvas id="mega-eraser-preview"></canvas>
+
     <!-- Grid Canvas - 在画布之上但在UI之下 -->
     <canvas id="grid-canvas"></canvas>
 
     <!-- Bottom Right: Clean Page Navigation -->
     <div class="fixed bottom-3 right-3 z-50 flex items-center gap-1">
-        <button id="prevPageBtn" class="nav-btn" title="上一页">
+        <button id="prevPageBtn" class="nav-btn" ontouchstart="handlePrevPageTouch(event)" title="上一页">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M15 18l-6-6 6-6" />
             </svg>
@@ -894,7 +932,7 @@
 
         <div class="text-sm font-微软雅黑 text-white/50 w-12 text-center select-none" id="pageIndicator">1/1</div>
 
-        <button id="nextPageBtn" class="nav-btn" title="下一页">
+        <button id="nextPageBtn" class="nav-btn" ontouchstart="handleNextPageTouch(event)" title="下一页">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M9 18l6-6-6-6" />
             </svg>
@@ -904,11 +942,10 @@
     <!-- Bottom Center: Toolbar -->
     <div class="toolbar">
         <div style="position: relative;">
-            <button id="tool-pen" class="tool-btn" onclick="handlePenClick()" title="画笔">
-                <img id="img-pen" src="笔-松开.png" alt="笔">
+            <button id="tool-pen" class="tool-btn" onclick="handlePenClick()" ontouchstart="handlePenTouch(event)" title="画笔">
+                <img id="img-pen" src="icon/笔-松开.png" alt="笔">
             </button>
             <div id="penMenu" class="pen-menu">
-                <span class="pen-menu-close" onclick="closePenMenu()">&times;</span>
                 <div class="pen-menu-header">画笔设置</div>
 
                 <div class="color-section">
@@ -919,16 +956,16 @@
                 <div class="size-section">
                     <span class="section-label">粗细</span>
                     <div class="size-presets">
-                        <button class="size-preset-btn" onclick="setPenSize(1)" title="细">
+                        <button class="size-preset-btn" onclick="setPenSize(1)" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)" title="细">
                             <div class="size-preset-dot" style="width: 4px; height: 4px;"></div>
                         </button>
-                        <button class="size-preset-btn active" onclick="setPenSize(2.5)" title="中">
+                        <button class="size-preset-btn active" onclick="setPenSize(2.5)" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)" title="中">
                             <div class="size-preset-dot" style="width: 8px; height: 8px;"></div>
                         </button>
-                        <button class="size-preset-btn" onclick="setPenSize(5)" title="粗">
+                        <button class="size-preset-btn" onclick="setPenSize(5)" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)" title="粗">
                             <div class="size-preset-dot" style="width: 12px; height: 12px;"></div>
                         </button>
-                        <button class="size-preset-btn" onclick="setPenSize(10)" title="特粗">
+                        <button class="size-preset-btn" onclick="setPenSize(10)" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)" title="特粗">
                             <div class="size-preset-dot" style="width: 16px; height: 16px;"></div>
                         </button>
                     </div>
@@ -939,65 +976,67 @@
 
                 <!-- 自动校正开关 -->
                 <div class="grid-section">
-                    <div class="grid-toggle" onclick="toggleAutoCorrection()">
+                    <div class="grid-toggle" onclick="toggleAutoCorrection()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
                         <span class="grid-toggle-label">自动校正</span>
                         <div class="grid-toggle-switch" id="autoCorrectionSwitch"></div>
                     </div>
                 </div>
+
+
             </div>
         </div>
 
-        <button id="tool-eraser" class="tool-btn" onclick="setTool('eraser')" title="橡皮">
-            <img id="img-eraser" src="橡皮-松开.png" alt="橡皮">
+        <button id="tool-eraser" class="tool-btn" onclick="setTool('eraser')" ontouchstart="handleEraserTouch(event)" title="橡皮">
+            <img id="img-eraser" src="icon/橡皮-松开.png" alt="橡皮">
         </button>
 
-        <button id="btn-undo" class="tool-btn" onclick="undo()" title="撤回">
-            <img id="img-undo" src="撤回-松开.png" alt="撤回">
+        <button id="btn-undo" class="tool-btn" onclick="undo()" ontouchstart="handleUndoTouch(event)" title="撤回">
+            <img id="img-undo" src="icon/撤回-松开.png" alt="撤回">
         </button>
 
-        <button id="btn-clear" class="tool-btn" onclick="confirmClear()" title="清空">
-            <img id="img-clear" src="清除-松开.png" alt="清除">
+        <button id="btn-clear" class="tool-btn" onclick="confirmClear()" ontouchstart="handleClearTouch(event)" title="清空">
+            <img id="img-clear" src="icon/清除-松开.png" alt="清除">
         </button>
 
         <div style="position: relative;">
-            <button id="btn-more" class="tool-btn" onclick="handleMoreClick(event)" title="更多">
-                <img id="img-more" src="更多-松开.png" alt="更多">
+            <button id="btn-more" class="tool-btn" onclick="handleMoreClick(event)" ontouchstart="handleMoreTouch(event)" title="更多">
+                <img id="img-more" src="icon/更多-松开.png" alt="更多">
             </button>
             <div id="moreMenu" class="more-menu" onclick="event.stopPropagation()">
                 <div class="more-menu-header">更多功能</div>
                 <div class="more-menu-grid">
-                    <button class="more-menu-btn" onclick="startShapeDraw('circle')" title="圆形">
+                    <button class="more-menu-btn" onclick="startShapeDraw('circle')" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)" title="圆形">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="9" />
                         </svg>
                         <span>圆形</span>
                     </button>
-                    <button class="more-menu-btn" onclick="startShapeDraw('line')" title="直线">
+                    <button class="more-menu-btn" onclick="startShapeDraw('line')" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)" title="直线">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="5" y1="19" x2="19" y2="5" />
                         </svg>
                         <span>直线</span>
                     </button>
-                    <button class="more-menu-btn" onclick="startShapeDraw('dashed')" title="虚线">
+                    <button class="more-menu-btn" onclick="startShapeDraw('dashed')" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)" title="虚线">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3">
                             <line x1="5" y1="19" x2="19" y2="5" />
                         </svg>
                         <span>虚线</span>
                     </button>
-                    <button class="more-menu-btn" onclick="toggleTransparentMode()" title="透明模式">
+                    <button class="more-menu-btn" onclick="toggleTransparentMode()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)" title="透明模式">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
                         <span id="transparentModeText">透明模式</span>
                     </button>
-                    <button class="more-menu-btn" onclick="showVideoMenuFromMore()" title="视频背景">
+                    <button class="more-menu-btn" onclick="showVideoMenuFromMore()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)" title="视频背景">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polygon points="23 7 16 12 23 17 23 7"></polygon>
                             <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                         </svg>
                         <span>视频背景</span>
                     </button>
-                    <button class="more-menu-btn" onclick="showAbout()" title="关于">
+                    <button class="more-menu-btn" onclick="showAbout()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)" title="关于">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10" />
                             <path d="M12 16v-4" />
@@ -1010,7 +1049,7 @@
             <!-- 视频背景菜单（从更多菜单打开） -->
             <div id="videoMenu" class="video-menu" onclick="event.stopPropagation()">
                 <div class="video-menu-header">视频背景设置</div>
-                <div class="video-toggle" onclick="toggleVideoBackground()">
+                <div class="video-toggle" onclick="toggleVideoBackground()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
                     <span class="video-toggle-label">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polygon points="23 7 16 12 23 17 23 7"></polygon>
@@ -1024,8 +1063,8 @@
             </div>
         </div>
 
-        <button id="btn-lottery" class="tool-btn" onclick="showLottery()" title="抽学号">
-            <img id="img-lottery" src="抽学号-松开.png" alt="抽学号">
+        <button id="btn-lottery" class="tool-btn" onclick="showLottery()" ontouchstart="handleLotteryTouch(event)" title="抽学号">
+            <img id="img-lottery" src="icon/抽学号-松开.png" alt="抽学号">
         </button>
     </div>
 
@@ -1046,7 +1085,7 @@
         <div class="confirm-modal">
             <div class="confirm-modal-top-bar"></div>
             <div class="confirm-modal-content">
-                <div class="confirm-bar-text">设备性能严重不足，继续添加可能导致书写卡顿。</div>
+                <div class="confirm-bar-text">设备性能不足时过多页数可能导致未知BUG</div>
                 <div class="confirm-bar-buttons">
                     <button onclick="confirmAddPage()" class="confirm-btn confirm-btn-confirm">继续加页</button>
                     <button onclick="closePerfModal()" class="confirm-btn confirm-btn-cancel">取消操作</button>
@@ -1071,7 +1110,7 @@
     <div class="number-result" id="numberResult">
         <div class="result-close-layer" id="resultCloseLayer"></div>
         <div class="result-number" id="resultNumber"></div>
-        <div class="result-tip">恭喜你中大奖啦！<br>花奈咪祝你每天欢愉~</div>
+        
     </div>
 
     <!-- 关于对话框 - 新样式 -->
@@ -1080,7 +1119,7 @@
             <div class="confirm-modal-top-bar"></div>
             <div class="confirm-modal-content">
                 <div class="confirm-bar-text">
-                    Interactive Blackboard 26w14a _ 此项目已在GitHub上开源:<br>
+                    Interactive Blackboard 26w15a _ 此项目已在GitHub上开源:<br>
                     <a href="https://github.com/yzh1hdy/Floating-blackboard" target="_blank">https://github.com/yzh1hdy/Floating-blackboard</a>
                 </div>
                 <div class="confirm-bar-buttons">
@@ -1122,7 +1161,7 @@
             perfWarningThreshold: 10,
             history: [],
             historyStep: -1,
-            eraserRadius: 15,
+            eraserRadius: 25,
             penMenuOpen: false,
             moreMenuOpen: false,
             videoMenuOpen: false,
@@ -1155,7 +1194,17 @@
             videoBackgroundEnabled: false,
             videoStream: null,
             // 透明背景模式
-            transparentMode: false
+            transparentMode: false,
+            // 超大橡皮擦模式
+            isMegaEraser: false,
+            megaEraserThreshold: 400, // 超大橡皮擦触发阈值 px²
+            megaEraserRadius: 100,    // 超大橡皮擦半径
+            normalEraserRadius: 25,     // 普通橡皮擦半径
+            touchStartArea: 0,          // 触控起始面积
+            touchStartTime: 0,          // 触控起始时间
+            // 超大橡皮擦预览层
+            megaEraserPreviewCanvas: null,
+            megaEraserPreviewCtx: null
         };
 
         // --- 抽学号配置 ---
@@ -1186,18 +1235,114 @@
         const videoBackground = document.getElementById('video-background');
 
         const icons = {
-            pen: { btn: document.getElementById('tool-pen'), img: document.getElementById('img-pen'), released: '笔-松开.png', pressed: '笔-按下.png' },
-            eraser: { btn: document.getElementById('tool-eraser'), img: document.getElementById('img-eraser'), released: '橡皮-松开.png', pressed: '橡皮-按下.png' },
-            undo: { btn: document.getElementById('btn-undo'), img: document.getElementById('img-undo'), released: '撤回-松开.png', pressed: '撤回-按下.png' },
-            clear: { btn: document.getElementById('btn-clear'), img: document.getElementById('img-clear'), released: '清除-松开.png', pressed: '清除-按下.png' },
-            more: { btn: document.getElementById('btn-more'), img: document.getElementById('img-more'), released: '更多-松开.png', pressed: '更多-按下.png' },
-            lottery: { btn: document.getElementById('btn-lottery'), img: document.getElementById('img-lottery'), released: '抽学号-松开.png', pressed: '抽学号-按下.png' }
+            pen: { btn: document.getElementById('tool-pen'), img: document.getElementById('img-pen'), released: 'icon/笔-松开.png', pressed: 'icon/笔-按下.png' },
+            eraser: { btn: document.getElementById('tool-eraser'), img: document.getElementById('img-eraser'), released: 'icon/橡皮-松开.png', pressed: 'icon/橡皮-按下.png' },
+            undo: { btn: document.getElementById('btn-undo'), img: document.getElementById('img-undo'), released: 'icon/撤回-松开.png', pressed: 'icon/撤回-按下.png' },
+            clear: { btn: document.getElementById('btn-clear'), img: document.getElementById('img-clear'), released: 'icon/清除-松开.png', pressed: 'icon/清除-按下.png' },
+            more: { btn: document.getElementById('btn-more'), img: document.getElementById('img-more'), released: 'icon/更多-松开.png', pressed: 'icon/更多-按下.png' },
+            lottery: { btn: document.getElementById('btn-lottery'), img: document.getElementById('img-lottery'), released: 'icon/抽学号-松开.png', pressed: 'icon/抽学号-按下.png' }
         };
 
-        // --- Initialization ---
+
+        // --- 触摸处理函数（防止高DPI触屏上的滑动误触）---
+        function handlePenTouch(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            handlePenClick();
+        }
+
+        function handleEraserTouch(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            setTool('eraser');
+        }
+
+        function handleUndoTouch(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            undo();
+        }
+
+        function handleClearTouch(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            confirmClear();
+        }
+
+        function handleMoreTouch(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            handleMoreClick(e);
+        }
+
+        function handleLotteryTouch(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            showLottery();
+        }
+
+        function handlePrevPageTouch(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (state.currentPage > 0) {
+                goToPage(state.currentPage - 1);
+            }
+        }
+
+        function handleNextPageTouch(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (state.currentPage < state.pages.length - 1) {
+                goToPage(state.currentPage + 1);
+            } else {
+                if (state.pages.length >= state.perfWarningThreshold) {
+                    showPerfWarning();
+                } else {
+                    addPage();
+                }
+            }
+        }
+
+        
+// --- 通用触摸按钮处理函数 ---
+let touchHandled = false;
+let touchMoved = false;
+let touchStartY = 0;
+
+function handleTouchStartBtn(e) {
+    touchHandled = true;
+    touchMoved = false;
+    touchStartY = e.touches[0].clientY;
+}
+
+function handleTouchMoveBtn(e) {
+    if (touchHandled) {
+        const touchY = e.touches[0].clientY;
+        if (Math.abs(touchY - touchStartY) > 10) {
+            touchMoved = true;
+        }
+    }
+}
+
+function handleTouchEndBtn(e) {
+    if (touchHandled && !touchMoved) {
+        touchHandled = false;
+        // 阻止默认行为，防止click事件触发
+        e.preventDefault();
+        e.stopPropagation();
+        // 触发点击
+        const btn = e.currentTarget;
+        if (btn && btn.onclick) {
+            btn.onclick.call(btn, e);
+        }
+    }
+}
+
+// --- Initialization ---
         function init() {
             createCanvas();
             createGridCanvas();
+            createMegaEraserPreview();
             state.pages.push(null);
             updateUI();
             updateToolIcons();
@@ -1364,6 +1509,58 @@
             drawGrid();
         }
 
+        // --- 创建超大橡皮擦预览层 ---
+        function createMegaEraserPreview() {
+            const previewCanvas = document.getElementById('mega-eraser-preview');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = container.getBoundingClientRect();
+
+            previewCanvas.width = rect.width * dpr;
+            previewCanvas.height = rect.height * dpr;
+            previewCanvas.style.width = rect.width + 'px';
+            previewCanvas.style.height = rect.height + 'px';
+
+            state.megaEraserPreviewCtx = previewCanvas.getContext('2d');
+            state.megaEraserPreviewCtx.scale(dpr, dpr);
+            state.megaEraserPreviewCanvas = previewCanvas;
+        }
+
+        // --- 绘制橡皮擦预览 ---
+        function drawMegaEraserPreview(x, y, radius) {
+            if (!state.megaEraserPreviewCtx) return;
+            
+            // 如果没有传入半径，使用当前橡皮擦半径
+            if (radius === undefined) {
+                radius = state.isMegaEraser ? state.megaEraserRadius : state.eraserRadius;
+            }
+
+            const ctx = state.megaEraserPreviewCtx;
+            const rect = container.getBoundingClientRect();
+
+            // 清除之前的预览
+            ctx.clearRect(0, 0, rect.width, rect.height);
+
+            // 绘制粉色半透明填充圆
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 192, 203, 0.4)'; // 粉色半透明
+            ctx.fill();
+
+            // 绘制不透明边框
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ffc0cb'; // 纯粉色边框
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // --- 清除超大橡皮擦预览 ---
+        function clearMegaEraserPreview() {
+            if (!state.megaEraserPreviewCtx) return;
+            const rect = container.getBoundingClientRect();
+            state.megaEraserPreviewCtx.clearRect(0, 0, rect.width, rect.height);
+        }
+
         function drawGrid() {
             if (!state.gridCtx || !state.gridEnabled) return;
 
@@ -1441,6 +1638,9 @@
                 btn.style.backgroundColor = color.value;
                 btn.title = color.name;
                 btn.onclick = () => setPenColor(color.value, btn);
+                btn.ontouchstart = (e) => { handleTouchStartBtn(e); };
+                btn.ontouchmove = (e) => { handleTouchMoveBtn(e); };
+                btn.ontouchend = (e) => { handleTouchEndBtn(e); };
                 palette.appendChild(btn);
             });
         }
@@ -2087,15 +2287,21 @@
                     } else if (state.tool === 'eraser') {
                         state.ctx.globalCompositeOperation = 'destination-out';
 
+                        // 超大橡皮擦模式下使用更大的擦除区域
+                        const eraserRadius = state.isMegaEraser ? state.megaEraserRadius : state.eraserRadius;
+
                         for (const point of points) {
                             state.ctx.beginPath();
-                            state.ctx.arc(point.x, point.y, state.eraserRadius, 0, Math.PI * 2);
+                            state.ctx.arc(point.x, point.y, eraserRadius, 0, Math.PI * 2);
                             state.ctx.fill();
                         }
 
                         const lastPoint = points[points.length - 1];
                         touchState.lastX = lastPoint.x;
                         touchState.lastY = lastPoint.y;
+
+                        // 更新橡皮擦预览位置（普通和超大模式都显示）
+                        drawMegaEraserPreview(lastPoint.x, lastPoint.y, eraserRadius);
                     }
                 }
             }
@@ -2383,6 +2589,17 @@
                 updateGridCanvas();
             }
 
+            // 更新超大橡皮擦预览层大小
+            if (state.megaEraserPreviewCanvas) {
+                state.megaEraserPreviewCanvas.width = rect.width * dpr;
+                state.megaEraserPreviewCanvas.height = rect.height * dpr;
+                state.megaEraserPreviewCanvas.style.width = rect.width + 'px';
+                state.megaEraserPreviewCanvas.style.height = rect.height + 'px';
+                if (state.megaEraserPreviewCtx) {
+                    state.megaEraserPreviewCtx.scale(dpr, dpr);
+                }
+            }
+
             saveCurrentPage();
         }
 
@@ -2455,6 +2672,40 @@
 
             const rect = state.canvas.getBoundingClientRect();
 
+            // 如果当前是橡皮擦模式（普通或超大），显示预览
+            if (state.tool === 'eraser' && state.megaEraserPreviewCanvas) {
+                state.megaEraserPreviewCanvas.classList.add('active');
+            }
+
+            // 计算总触控面积（检测超大橡皮擦模式）
+            let totalTouchArea = 0;
+            const allTouches = e.touches.length > 0 ? e.touches : e.changedTouches;
+            for (let i = 0; i < allTouches.length; i++) {
+                const touch = allTouches[i];
+                // 使用 touch 的 radiusX 和 radiusY 估算接触面积，如果没有则使用默认值
+                const radiusX = touch.radiusX || 10;
+                const radiusY = touch.radiusY || 10;
+                // 椭圆面积公式：π * a * b
+                const touchArea = Math.PI * radiusX * radiusY;
+                totalTouchArea += touchArea;
+            }
+
+            // 检测是否触发超大橡皮擦模式
+            if (totalTouchArea > state.megaEraserThreshold && state.tool !== 'eraser') {
+                state.isMegaEraser = true;
+                state.touchStartArea = totalTouchArea;
+                state.touchStartTime = Date.now();
+                // 临时切换到橡皮擦模式并设置超大半径
+                state.normalEraserRadius = state.eraserRadius;
+                state.eraserRadius = state.megaEraserRadius;
+                setTool('eraser');
+                // 添加视觉反馈 - 隐藏光标，显示预览层
+                container.classList.add('mega-eraser-active');
+                if (state.megaEraserPreviewCanvas) {
+                    state.megaEraserPreviewCanvas.classList.add('active');
+                }
+            }
+
             for (let i = 0; i < e.changedTouches.length; i++) {
                 const touch = e.changedTouches[i];
                 const touchId = touch.identifier;
@@ -2496,6 +2747,30 @@
         function handleTouchEnd(e) {
             e.preventDefault();
             const rect = state.canvas.getBoundingClientRect();
+
+            // 检查是否所有触摸都已结束
+            const remainingTouches = e.touches.length;
+
+            // 如果所有触摸结束，隐藏预览并恢复设置
+            if (remainingTouches === 0) {
+                // 延迟一点时间确保绘制完成
+                setTimeout(() => {
+                    // 清除预览
+                    clearMegaEraserPreview();
+                    if (state.megaEraserPreviewCanvas) {
+                        state.megaEraserPreviewCanvas.classList.remove('active');
+                    }
+                    
+                    // 如果是超大橡皮擦模式，恢复设置
+                    if (state.isMegaEraser) {
+                        state.eraserRadius = state.normalEraserRadius;
+                        state.isMegaEraser = false;
+                        container.classList.remove('mega-eraser-active');
+                        // 自动切换回画笔模式
+                        setTool('pen');
+                    }
+                }, 50);
+            }
 
             for (let i = 0; i < e.changedTouches.length; i++) {
                 const touch = e.changedTouches[i];
@@ -2591,7 +2866,7 @@
         init();
     </script>
 
-    <div class="fixed bottom-3 left-4 text-white/50 text-sm z-50">   26w14a-测试版</div>
+    <div class="fixed bottom-3 left-4 text-white/50 text-sm z-50">   26w15a-测试版</div>
 
 </body>
 </html>
