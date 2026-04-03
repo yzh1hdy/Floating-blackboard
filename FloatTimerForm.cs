@@ -28,6 +28,9 @@ namespace _01
         private readonly Point btnPos;
         private readonly Size btnSize;
 
+        // 记录任务栏状态变化时工作区（用于 Hide/Show 恢复）
+        private Rectangle _originalWorkArea;
+
         private readonly System.Windows.Forms.Timer topMostTimer;
         private readonly System.Windows.Forms.Timer focusCheckTimer;
         private CoreWebView2Environment _webViewEnvironment;
@@ -85,6 +88,9 @@ namespace _01
 
             var scr = Screen.PrimaryScreen.WorkingArea;
             btnPos = new Point(scr.Left, scr.Bottom - btnSize.Height - 30);
+
+            // 记录原始工作区，以便任务栏隐藏后恢复
+            _originalWorkArea = Screen.PrimaryScreen.WorkingArea;
 
             #region 3. 按钮窗口：普通 TopMost + Region 镂空，可点击穿透
             btnForm = new Form
@@ -193,6 +199,8 @@ namespace _01
             #region 10. 性能模式初始化
             InitializePerformanceMode();
             #endregion
+
+            this.FormClosing += FloatTimerForm_FormClosing;
         }
 
         #region 配置管理
@@ -587,6 +595,11 @@ namespace _01
             }
         }
 
+        private void FloatTimerForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            ShowTaskbar();
+        }
+
         private void ForceWebLayerTopMost()
         {
             if (webLayer == null || webLayer.IsDisposed || !webLayer.Visible) return;
@@ -716,6 +729,8 @@ namespace _01
 
             EmergencyReleaseMemory();
 
+            ShowTaskbar();
+
             btnForm?.Close();
             btnForm?.Dispose();
         }
@@ -729,7 +744,6 @@ namespace _01
             webLayer = new Form
             {
                 FormBorderStyle = FormBorderStyle.None,
-                WindowState = FormWindowState.Maximized,
                 TopMost = true,
                 ShowInTaskbar = false,
                 Text = "",
@@ -737,6 +751,11 @@ namespace _01
                 Visible = false,
                 StartPosition = FormStartPosition.Manual
             };
+
+            // 避免任务栏保留区域导致底部不可点击，使用屏幕边界而非 Maxmized
+            Rectangle screenBounds = Screen.PrimaryScreen.Bounds;
+            webLayer.Bounds = screenBounds;
+
             // 移除SetToolWindow，让webLayer可以被激活为前台窗口
             // SetToolWindow(webLayer.Handle);
 
@@ -785,6 +804,7 @@ namespace _01
                             btnForm.Show();
                             btnToggle.Image = Image.FromFile(imgExpand);
                             SetButtonRegion(btnForm, (Bitmap)btnToggle.Image);
+                            ShowTaskbar();
                         }
                     }));
                 }
@@ -859,7 +879,17 @@ namespace _01
                     _isSettingZOrder = true;
                     try
                     {
-                        webLayer.Show();
+                        // 先展示WebLayer，避免任务栏切换导致延迟显示
+                        if (webLayer != null && !webLayer.IsDisposed)
+                        {
+                            webLayer.Bounds = Screen.PrimaryScreen.Bounds;
+                            webLayer.Show();
+                            ForceWebLayerTopMost();
+                            ForceWindowToFront(webLayer.Handle);
+                        }
+
+                        // 再处理任务栏隐藏和工作区调整
+                        HideTaskbar();
 
                         this.BeginInvoke(new Action(() =>
                         {
@@ -888,6 +918,7 @@ namespace _01
                 btnForm.Show();
                 btnToggle.Image = Image.FromFile(imgExpand);
                 SetButtonRegion(btnForm, (Bitmap)btnToggle.Image);
+                ShowTaskbar();
             }
         }
 
@@ -914,6 +945,39 @@ namespace _01
             {
                 AttachThreadInput(fgThread, appThread, false);
             }
+        }
+
+        private void HideTaskbar()
+        {
+            IntPtr taskbar = FindWindow("Shell_TrayWnd", null);
+            IntPtr startButton = FindWindow("Button", null);
+            if (taskbar != IntPtr.Zero) ShowWindow(taskbar, SW_HIDE);
+            if (startButton != IntPtr.Zero) ShowWindow(startButton, SW_HIDE);
+
+            // 同时设置工作区为整个屏幕，避免留下“空白”保留区域
+            var screenBounds = Screen.PrimaryScreen.Bounds;
+            var fullRect = new RECT { left = screenBounds.Left, top = screenBounds.Top, right = screenBounds.Right, bottom = screenBounds.Bottom };
+            SystemParametersInfo(SPI_SETWORKAREA, 0, ref fullRect, SPIF_SENDCHANGE);
+
+            // 兼容性的AppBar通知
+            var abd = new APPBARDATA { cbSize = Marshal.SizeOf(typeof(APPBARDATA)), hWnd = taskbar, rc = fullRect, lParam = ABS_AUTOHIDE };
+            SHAppBarMessage(ABM_SETSTATE, ref abd);
+        }
+
+        private void ShowTaskbar()
+        {
+            IntPtr taskbar = FindWindow("Shell_TrayWnd", null);
+            IntPtr startButton = FindWindow("Button", null);
+            if (taskbar != IntPtr.Zero) ShowWindow(taskbar, SW_SHOW);
+            if (startButton != IntPtr.Zero) ShowWindow(startButton, SW_SHOW);
+
+            // 恢复启动前的工作区
+            var restoreRect = new RECT { left = _originalWorkArea.Left, top = _originalWorkArea.Top, right = _originalWorkArea.Right, bottom = _originalWorkArea.Bottom };
+            SystemParametersInfo(SPI_SETWORKAREA, 0, ref restoreRect, SPIF_SENDCHANGE);
+
+            // 兼容性的AppBar通知
+            var abd = new APPBARDATA { cbSize = Marshal.SizeOf(typeof(APPBARDATA)), hWnd = taskbar, rc = restoreRect, lParam = 0 };
+            SHAppBarMessage(ABM_SETSTATE, ref abd);
         }
         #endregion
 
@@ -943,6 +1007,12 @@ namespace _01
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
         [DllImport("user32.dll")]
         private static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
 
@@ -967,6 +1037,12 @@ namespace _01
         [DllImport("user32.dll")]
         private static extern bool GetCursorPos(out POINT lpPoint);
 
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool SystemParametersInfo(int uiAction, int uiParam, ref RECT pvParam, int fWinIni);
+
+        [DllImport("shell32.dll", SetLastError = true)]
+        private static extern IntPtr SHAppBarMessage(uint dwMessage, ref APPBARDATA pData);
+
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT
         {
@@ -974,8 +1050,37 @@ namespace _01
             public int Y;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int left;
+            public int top;
+            public int right;
+            public int bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct APPBARDATA
+        {
+            public int cbSize;
+            public IntPtr hWnd;
+            public uint uCallbackMessage;
+            public uint uEdge;
+            public RECT rc;
+            public int lParam;
+        }
+
+        private const int SW_HIDE = 0;
         private const int SW_SHOW = 5;
         private const int SW_SHOWNOACTIVATE = 4;
+
+        private const int SPI_SETWORKAREA = 0x002F;
+        private const int SPIF_SENDCHANGE = 0x0002;
+
+        private const uint ABM_GETSTATE = 0x00000004;
+        private const uint ABM_SETSTATE = 0x0000000A;
+        private const int ABS_AUTOHIDE = 0x1;
+
         private const int WS_EX_NOACTIVATE = 0x08000000;
 
         [DllImport("kernel32.dll")]
