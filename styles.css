@@ -1,0 +1,878 @@
+* {
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+body {
+    background-color: #0f261e;
+    overflow: hidden;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* 透明背景模式 */
+body.transparent-mode {
+    background-color: transparent !important;
+}
+
+body.transparent-mode #canvas-container {
+    background-color: transparent !important;
+}
+
+/* 透明模式下所有弹出菜单的背景调整为半透明 */
+body.transparent-mode .pen-menu,
+body.transparent-mode .more-menu,
+body.transparent-mode .video-menu {
+    background: url('icon/penset-bg.png') center/cover no-repeat; background-size: 100% 100%;
+    backdrop-filter: blur(12px);
+}
+
+/* 透明模式下工具栏和导航按钮完全透明背景 */
+body.transparent-mode .toolbar,
+body.transparent-mode .fixed.bottom-3 {
+    background: transparent !important;
+    backdrop-filter: none;
+}
+
+/* 透明模式下按钮悬停效果 */
+body.transparent-mode .nav-btn:hover:not(:disabled) {
+    background: rgba(255,255,255,0.08);
+}
+
+.cursor-pen { cursor: crosshair; }
+
+.cursor-eraser-active {
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.8)" stroke-width="1.5" style="shape-rendering: geometricPrecision;"/></svg>') 20 20, auto;
+}
+/* 超大橡皮擦模式样式 - 粉色半透明 */
+.mega-eraser-active {
+    cursor: none !important;
+}
+
+/* 超大橡皮擦预览层 */
+#mega-eraser-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 20;
+    display: none;
+}
+
+#mega-eraser-preview.active {
+    display: block;
+}
+
+
+.nav-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.6);
+    border-radius: 10px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    cursor: pointer;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+.nav-btn:disabled { 
+    opacity: 0.15; 
+    cursor: default;
+    border-color: rgba(255,255,255,0.1);
+}
+.nav-btn:hover:not(:disabled) {
+    background: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.9);
+    border-color: rgba(255,255,255,0.3);
+}
+
+.toolbar {
+    position: fixed;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    gap: 0;
+    transition: all 0.3s ease;
+}
+
+.tool-btn {
+    width: 56px;
+    height: 56px;
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* 移除按下缩小效果 */
+    transition: none;
+}
+
+/* 移除 tool-btn 的 active 缩小效果 */
+.tool-btn:active {
+    transform: none;
+}
+
+.tool-btn img {
+    width: 56px;
+    height: 56px;
+    pointer-events: none;
+    user-select: none;
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    touch-action: none;
+}
+
+@keyframes popIn {
+    0% { transform: scale(0.9); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+.modal-content { animation: popIn 0.1s ease-out; }
+
+.number-result {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.55);
+    backdrop-filter: blur(8px);
+    z-index: 101;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+/* 透明模式下抽奖结果背景也调整为半透明 */
+body.transparent-mode .number-result {
+    background: rgba(0,0,0,0.3);
+}
+
+.result-number {
+    font-size: 8rem;
+    font-weight: 500;
+    color: #FFF;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'segoe ui';
+    position: relative;
+    z-index: 2;
+}
+
+.result-number::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -48%);
+    width: 150rem;
+    height: 52%;
+    background-color: #ffc0cb;
+    z-index: -1;
+    border-radius: 0;
+}
+
+@keyframes numberAppear {
+    0% { transform: scale(1.2); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.result-tip {
+    margin-top: 2rem;
+    font-size: .9rem;
+    color: rgba(255,255,255,.7);
+    letter-spacing: 1px;
+    pointer-events: none;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.result-close-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    cursor: pointer;
+}
+
+.result-number, .result-tip {
+    position: relative;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.pen-menu {
+    display: none;
+    position: absolute;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: url('icon/penset-bg.png') center/cover no-repeat; background-size: 100% 100%;
+    border: none;
+    border-radius: 12px;
+    padding: 20px;
+    z-index: 60;
+    min-width: 220px;
+    animation: menuPopIn 0.2s ease-out;
+    transition: background 0.3s ease;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.pen-menu.show {
+    display: block;
+}
+
+@keyframes menuPopIn {
+    0% { transform: translateX(-50%) translateY(10px); opacity: 0; }
+    100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+.pen-menu-header {
+    color: #fff;
+    font-size: 16px;
+    margin-bottom: 16px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    padding-bottom: 12px;
+    font-weight: 500;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.pen-menu-close {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    color: rgba(0,0,0,0.6);
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.pen-menu-close:hover {
+    color: rgba(0,0,0,0.95);
+    background: rgba(0,0,0,0.1);
+}
+
+.color-section {
+    margin-bottom: 16px;
+}
+
+.section-label {
+    color: #ffc0cb;
+    font-size: 12px;
+    margin-bottom: 10px;
+    display: block;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.color-palette {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.color-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+
+
+.color-btn.active {
+    border-color: #ffc0cb;
+    box-shadow: 0 0 0 2px rgba(255, 192, 203, 0.5);
+}
+
+.color-btn.active::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffc0cb;
+    font-size: 16px;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+}
+
+.size-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.size-presets {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.size-preset-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.1);
+    border: 2px solid transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+
+
+.size-preset-btn.active {
+    background: rgba(255, 192, 203, 0.3);
+    border-color: #ffc0cb;
+    box-shadow: 0 0 0 2px rgba(255, 192, 203, 0.4);
+}
+
+.size-preset-dot {
+    background: #ffc0cb;
+    border-radius: 50%;
+}
+
+/* 网格线开关样式 */
+.grid-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.grid-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.grid-toggle:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.grid-toggle-label {
+    color: #ffc0cb;
+    font-size: 13px;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.grid-toggle-switch {
+    width: 44px;
+    height: 24px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 12px;
+    position: relative;
+    transition: all 0.3s;
+}
+
+.grid-toggle-switch.active {
+    background: #ffc0cb;
+}
+
+.grid-toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: all 0.3s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.grid-toggle-switch.active::after {
+    left: 22px;
+}
+
+.confirm-bar {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.2s ease-out forwards;
+}
+
+.confirm-bar.show {
+    display: flex;
+}
+
+@keyframes fadeIn {
+    0% { background: rgba(0,0,0,0); }
+    100% { background: rgba(0,0,0,0.5); }
+}
+
+.confirm-modal {
+    background: #ffffff;
+    width: 100vw;
+    height: 20vh;
+    position: relative;
+    overflow: visible;
+    animation: slideInFromRight 0.1s ease-out;
+}
+
+@keyframes slideInFromRight {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(0); }
+}
+
+.confirm-modal-top-bar {
+    height: 16px;
+    background: #ff4145;
+    width: 100%;
+}
+
+.confirm-modal-content {
+    padding: 24px;
+    display: flex;
+    flex-direction: row;
+    height: calc(20vh - 16px);
+    position: relative;
+    align-items: center;
+}
+
+.about-image {
+    width: auto;
+    height: 80%;
+    max-height: calc(20vh - 48px);
+    margin-right: 24px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.confirm-bar-text {
+    color: #333333;
+    font-size: 1.2rem;
+    font-weight: 500;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    text-align: center;
+    flex: 1;
+}
+
+/* 非关于弹窗中保持原有定位 */
+.confirm-bar:not(#aboutDialog) .confirm-bar-text,
+#clearAllConfirm .confirm-bar-text,
+#clearCurrentConfirm .confirm-bar-text,
+#importConfirm .confirm-bar-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    flex: none;
+}
+
+.confirm-bar-buttons {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+}
+
+.confirm-btn {
+    padding: 8px 80px;
+    border: 5px solid white;
+    border-radius: 24px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: none;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.confirm-btn-cancel {
+    background-color: #ffef01;
+    color: #333333;
+}
+
+.confirm-btn-confirm {
+    background-color: #ff4145;
+    color: #ffffff;
+}
+
+/* 网格线层 */
+#grid-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* 更多菜单样式 */
+.more-menu {
+    display: none;
+    position: absolute;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: url('icon/more-bg.png') center/cover no-repeat; background-size: 100% 100%;
+    border: none;
+    border-radius: 12px;
+    padding: 16px;
+    z-index: 60;
+    min-width: 200px;
+    animation: menuPopIn 0.2s ease-out;
+    transition: background 0.3s ease;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.more-menu.show {
+    display: block;
+}
+
+.more-menu-header {
+    color: #fff;
+    font-size: 16px;
+    margin-bottom: 12px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    padding-bottom: 10px;
+    font-weight: 500;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.more-menu-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.more-menu-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 8px;
+    background: rgba(255,255,255,0.5);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: none;
+    color: #ffc0cb;
+    gap: 6px;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.more-menu-btn:hover {
+    background: rgba(255,255,255,0.12);
+}
+
+.more-menu-btn svg {
+    width: 24px;
+    height: 24px;
+    stroke: #ffc0cb;
+}
+
+.more-menu-btn span {
+    font-size: 12px;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    color: #ffc0cb;
+}
+
+/* 关于对话框 - 使用清除弹窗样式但无顶部红色条 */
+.about-dialog {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0);
+    z-index: 2000;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.2s ease-out forwards;
+}
+
+.about-dialog.show {
+    display: flex;
+}
+
+.about-modal {
+    background: #ffffff;
+    width: 100vw;
+    height: 20vh;
+    position: relative;
+    overflow: visible;
+    animation: slideInFromRight 0.1s ease-out;
+}
+
+.about-modal-content {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    height: 20vh;
+    position: relative;
+}
+
+.about-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #333333;
+    font-size: 1.2rem;
+    font-weight: 500;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    text-align: center;
+}
+
+.about-close-btn {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 80px;
+    border: 5px solid white;
+    border-radius: 24px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: none;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    background-color: #ffef01;
+    color: #333333;
+}
+
+/* 关于视频弹窗 */
+.video-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    background: rgba(0, 0, 0, 0.6);
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+}
+
+.video-overlay.show {
+    display: flex;
+}
+
+.video-modal {
+    position: relative;
+    width: 50vw;
+    max-width: 850px;
+    min-width: 320px;
+    background: rgba(0, 0, 0, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.video-modal video {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.video-close-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.video-close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 视频背景菜单样式 */
+.video-menu {
+    display: none;
+    position: absolute;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: url('icon/penset-bg.png') center/cover no-repeat; background-size: 100% 100%;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 12px;
+    padding: 16px;
+    z-index: 60;
+    min-width: 200px;
+    animation: menuPopIn 0.2s ease-out;
+    transition: background 0.3s ease;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.video-menu.show {
+    display: block;
+}
+
+.video-menu-header {
+    color: rgba(255,255,255,0.95);
+    font-size: 14px;
+    margin-bottom: 12px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    padding-bottom: 10px;
+    font-weight: 500;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.video-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 12px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.video-toggle:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.video-toggle-label {
+    color: rgba(255,255,255,0.9);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.video-toggle-switch {
+    width: 44px;
+    height: 24px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 12px;
+    position: relative;
+    transition: all 0.3s;
+}
+
+.video-toggle-switch.active {
+    background: #ffc0cb;
+}
+
+.video-toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: all 0.3s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.video-toggle-switch.active::after {
+    left: 22px;
+}
+
+.video-status {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    text-align: center;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* 视频背景元素 - 最底层 */
+#video-background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    z-index: 1;
+    display: none;
+}
+
+#video-background.active {
+    display: block;
+}
+
+/* Canvas容器 - 中间层 (z-index: 10) */
+#canvas-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10;
+    background-color: #0f261e;
+    transition: background-color 0.3s ease;
+}
+
+/* 视频激活时画布容器背景变透明 */
+body.video-active #canvas-container {
+    background-color: transparent;
+}
+
+/* 主画布 - 透明背景 */
+#main-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    background-color: transparent;
+}
+
+/* 网格画布 */
+#grid-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* 确保UI元素在顶层 */
+.toolbar, .fixed.bottom-3 {
+    z-index: 100;
+}
+
+/* 版本号文字在透明模式下增加阴影提高可读性 */
+body.transparent-mode .fixed.bottom-3.left-4 {
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
