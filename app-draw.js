@@ -348,12 +348,12 @@
                 let finalEndX = endX;
                 let finalEndY = endY;
 
-                // 如果接近水平（偏差<5度），吸附到水平
-                if (adjustedAngle < 5) {
+                // 如果接近水平（偏差<3度），吸附到水平
+                if (adjustedAngle < 3) {
                     finalEndY = startY;
                 }
-                // 如果接近垂直（偏差<5度），吸附到垂直
-                else if (adjustedAngle > 85) {
+                // 如果接近垂直（偏差<3度），吸附到垂直
+                else if (adjustedAngle > 87) {
                     finalEndX = startX;
                 }
 
@@ -489,12 +489,12 @@
                 const angleDeg = Math.abs(angleRad * 180 / Math.PI);
                 const adjustedAngle = angleDeg > 90 ? 180 - angleDeg : angleDeg;
 
-                // 如果接近水平（偏差<5度），吸附到水平
-                if (adjustedAngle < 5) {
+                // 如果接近水平（偏差<3度），吸附到水平
+                if (adjustedAngle < 3) {
                     finalEndY = startY;
                 }
-                // 如果接近垂直（偏差<5度），吸附到垂直
-                else if (adjustedAngle > 85) {
+                // 如果接近垂直（偏差<3度），吸附到垂直
+                else if (adjustedAngle > 87) {
                     finalEndX = startX;
                 }
 
@@ -710,89 +710,91 @@ function erasePoints(points, eraserRadius) {
             };
         }
 
-        function handleTouchMove(e) {
-            e.preventDefault();
-            const rect = state.canvas.getBoundingClientRect();
+function handleTouchMove(e) {
+    e.preventDefault();
+    if (!state.canvas) return;
+    const rect = state.canvas.getBoundingClientRect();
 
-            for (let i = 0; i < e.changedTouches.length; i++) {
-                const touch = e.changedTouches[i];
-                const touchId = touch.identifier;
-                const touchState = state.activeTouches.get(touchId);
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const touchId = touch.identifier;
+        const touchState = state.activeTouches.get(touchId);
 
-                if (!touchState || !touchState.isDrawing) continue;
+        // 1. 核心过滤：只处理第一根合法的手指，防止笔迹跳变
+        if (!touchState || !touchState.isDrawing) continue;
 
-                const x = touch.clientX - rect.left;
-                const y = touch.clientY - rect.top;
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
 
-                // 图形绘制预览模式
-                if (touchState.isShapeMode && state.shapeMode && state.shapeStartPoint) {
-                    drawShapePreview(state.shapeStartPoint.x, state.shapeStartPoint.y, x, y);
-                    touchState.lastX = x;
-                    touchState.lastY = y;
-                    continue;
-                }
-
-                touchState.pendingPoints.push({x, y});
-
-                // 处理待绘制点
-                if (touchState.pendingPoints.length > 0) {
-                    const points = touchState.pendingPoints.splice(0);
-
-                    if (state.tool === 'pen') {
-                        state.ctx.globalCompositeOperation = 'source-over';
-                        state.ctx.lineWidth = penConfig.currentSize;
-                        state.ctx.strokeStyle = penConfig.currentColor;
-                        state.ctx.lineCap = 'round';
-                        state.ctx.lineJoin = 'round';
-
-                        state.ctx.beginPath();
-                        state.ctx.moveTo(touchState.lastX, touchState.lastY);
-
-                        for (let j = 0; j < points.length; j++) {
-                            const point = points[j];
-                            touchState.points.push(point);
-
-                            if (j > 0) {
-                                const prev = points[j - 1];
-                                const midX = (prev.x + point.x) / 2;
-                                const midY = (prev.y + point.y) / 2;
-                                state.ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
-                            }
-                        }
-
-                        const lastPoint = points[points.length - 1];
-                        state.ctx.lineTo(lastPoint.x, lastPoint.y);
-                        state.ctx.stroke();
-
-                        touchState.lastX = lastPoint.x;
-                        touchState.lastY = lastPoint.y;
-                    } else if (state.tool === 'eraser') {
-                        // 超大橡皮擦模式下使用更大的擦除区域
-                        const eraserRadius = state.isMegaEraser ? state.megaEraserRadius : state.eraserRadius;
-
-                        // 橡皮擦优化：确保从上一个位置到新位置形成连续擦除路径
-                        if (points.length > 0) {
-                            // 将上一个位置作为起点，确保连续性
-                            if (touchState.lastX !== null && touchState.lastY !== null) {
-                                const startPoint = { x: touchState.lastX, y: touchState.lastY };
-                                // 在points前面插入起点，确保连线擦除
-                                if (points[0].x !== startPoint.x || points[0].y !== startPoint.y) {
-                                    points.unshift(startPoint);
-                                }
-                            }
-                            erasePoints(points, eraserRadius);
-                        }
-
-                        const lastPoint = points[points.length - 1];
-                        touchState.lastX = lastPoint.x;
-                        touchState.lastY = lastPoint.y;
-
-                        // 更新橡皮擦预览位置（普通和超大模式都显示）
-                        drawMegaEraserPreview(lastPoint.x, lastPoint.y, eraserRadius);
-                    }
-                }
-            }
+        // 2. 图形预览模式
+        if (touchState.isShapeMode && state.shapeMode && state.shapeStartPoint) {
+            drawShapePreview(state.shapeStartPoint.x, state.shapeStartPoint.y, x, y);
+            touchState.lastX = x;
+            touchState.lastY = y;
+            continue;
         }
+
+        // 3. 平滑绘制逻辑
+        if (state.tool === 'pen') {
+            state.ctx.globalCompositeOperation = 'source-over';
+            state.ctx.lineWidth = penConfig.currentSize;
+            state.ctx.strokeStyle = penConfig.currentColor;
+            state.ctx.lineCap = 'round';
+            state.ctx.lineJoin = 'round';
+
+            // 存入当前点
+            touchState.points.push({ x, y });
+
+            // 必须至少有 3 个点才能计算出平滑的贝塞尔曲线
+            if (touchState.points.length > 2) {
+                const points = touchState.points;
+                const lastIdx = points.length - 1;
+                
+                // 计算倒数第二个点和当前点的中点作为终点
+                const midPoint = {
+                    x: (points[lastIdx - 1].x + points[lastIdx].x) / 2,
+                    y: (points[lastIdx - 1].y + points[lastIdx].y) / 2
+                };
+
+                state.ctx.beginPath();
+                // 从上一次计算的中点开始（为了保持路径连续，我们需要存储上一个中点）
+                // 如果没有存储上一个中点，可以使用 points[lastIdx - 2] 与 points[lastIdx - 1] 的中点
+                const prevMidPoint = {
+                    x: (points[lastIdx - 2].x + points[lastIdx - 1].x) / 2,
+                    y: (points[lastIdx - 2].y + points[lastIdx - 1].y) / 2
+                };
+
+                state.ctx.moveTo(prevMidPoint.x, prevMidPoint.y);
+                // 控制点是 points[lastIdx - 1]，终点是当前的中点
+                state.ctx.quadraticCurveTo(points[lastIdx - 1].x, points[lastIdx - 1].y, midPoint.x, midPoint.y);
+                state.ctx.stroke();
+            } else {
+                // 点数不足 3 个时（刚开始画），先做简单的连线
+                state.ctx.beginPath();
+                state.ctx.moveTo(touchState.lastX, touchState.lastY);
+                state.ctx.lineTo(x, y);
+                state.ctx.stroke();
+            }
+
+            // 更新最后位置
+            touchState.lastX = x;
+            touchState.lastY = y;
+
+        } else if (state.tool === 'eraser') {
+            // 橡皮擦逻辑
+            const eraserRadius = state.isMegaEraser ? state.megaEraserRadius : state.eraserRadius;
+            const pts = [{ x: touchState.lastX, y: touchState.lastY }, { x, y }];
+            erasePoints(pts, eraserRadius);
+            
+            touchState.lastX = x;
+            touchState.lastY = y;
+            drawMegaEraserPreview(x, y, eraserRadius);
+        }
+    }
+}
+
+
+
 
         function setTool(toolName) {
             // 如果正在图形绘制模式，先退出
@@ -855,16 +857,16 @@ function erasePoints(points, eraserRadius) {
 
         function showPerfWarning() {
             state.pendingAddPage = true;
-            perfWarningBar.classList.add('show');
+            openPopup('perfWarningOverlay', 'perfWarningPopup');
         }
 
         function closePerfModal() {
-            perfWarningBar.classList.remove('show');
+            closePopup('perfWarningOverlay', 'perfWarningPopup');
             state.pendingAddPage = false;
         }
 
         function confirmAddPage() {
-            perfWarningBar.classList.remove('show');
+            closePopup('perfWarningOverlay', 'perfWarningPopup');
             if (state.pendingAddPage) {
                 state.pendingAddPage = false;
                 addPage();
@@ -900,37 +902,48 @@ function erasePoints(points, eraserRadius) {
             document.getElementById('prevPageBtn').disabled = state.currentPage === 0;
         }
 
-        function pushHistory() {
-            if (!state.canvas || !state.ctx) return;
+function pushHistory() {
+    if (!state.canvas || !state.ctx) return;
 
-            if (state.historyStep < state.history.length - 1) {
-                state.history = state.history.slice(0, state.historyStep + 1);
-            }
+    if (state.historyStep < state.history.length - 1) {
+        state.history = state.history.slice(0, state.historyStep + 1);
+    }
 
-            const imageData = state.ctx.getImageData(0, 0, state.canvas.width, state.canvas.height);
-            state.history.push(imageData);
-            state.historyStep++;
+    // 优化：创建一个离屏 Canvas 来保存当前帧的图像，而不是保存巨大的像素数据
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = state.canvas.width;
+    tempCanvas.height = state.canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.drawImage(state.canvas, 0, 0);
 
-            if (state.history.length > 80) {    //撤回上限
-                state.history.shift();
-                state.historyStep--;
-            }
+    state.history.push(tempCanvas); // 存储的是图像引用，浏览器会自动优化内存
+    state.historyStep++;
+
+    // 将撤回上限降低到 50
+    if (state.history.length > 50) {
+        state.history.shift();
+        state.historyStep--;
+    }
+}
+
+
+function undo() {
+    if (state.historyStep > 0) {
+        state.historyStep--;
+        const previousCanvas = state.history[state.historyStep];
+        
+        // 清除当前并绘制历史
+        state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+        state.ctx.drawImage(previousCanvas, 0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+    }
+}
+
+        function confirmClear() {
+            openPopup('clearConfirmOverlay', 'clearConfirmPopup');
         }
 
-        function undo() {
-            if (state.historyStep > 0) {
-                state.historyStep--;
-                const imageData = state.history[state.historyStep];
-                state.ctx.putImageData(imageData, 0, 0);
-            }
-        }
-
-        function confirmClear() { 
-            clearConfirmBar.classList.add('show'); 
-        }
-
-        function closeClearModal() { 
-            clearConfirmBar.classList.remove('show'); 
+        function closeClearModal() {
+            closePopup('clearConfirmOverlay', 'clearConfirmPopup');
         }
 
         function executeClear() {
@@ -942,6 +955,36 @@ function erasePoints(points, eraserRadius) {
                 state.lines = []; // 清空直线端点信息
             }
             closeClearModal();
+        }
+
+        // --- 新版弹窗控制函数 ---
+        function openPopup(overlayId, popupId) {
+            const overlay = document.getElementById(overlayId);
+            const popup = document.getElementById(popupId);
+            if (!overlay || !popup) return;
+            overlay.classList.add('active');
+            popup.classList.remove('leaving');
+            popup.classList.add('entering');
+        }
+
+        function closePopup(overlayId, popupId) {
+            const overlay = document.getElementById(overlayId);
+            const popup = document.getElementById(popupId);
+            if (!overlay || !popup) return;
+            popup.classList.remove('entering');
+            popup.classList.add('leaving');
+            setTimeout(function() {
+                overlay.classList.remove('active');
+                popup.classList.remove('leaving');
+            }, 500);
+        }
+
+        function handleClearOverlayClick(e) {
+            if (e.target === document.getElementById('clearConfirmOverlay')) closeClearModal();
+        }
+
+        function handlePerfOverlayClick(e) {
+            if (e.target === document.getElementById('perfWarningOverlay')) closePerfModal();
         }
 
         function isCloseToLine(points, threshold) {
@@ -1200,45 +1243,17 @@ function erasePoints(points, eraserRadius) {
         // --- 触摸事件 ---
         function handleTouchStart(e) {
             e.preventDefault();
-
-            // 关闭所有菜单
-            closeAllMenus();
-
             const rect = state.canvas.getBoundingClientRect();
 
-            // 如果当前是橡皮擦模式（普通或超大），显示预览
-            if (state.tool === 'eraser' && state.megaEraserPreviewCanvas) {
-                state.megaEraserPreviewCanvas.classList.add('active');
+            // 只有当这是第一根手指按下时，才执行全局初始化操作
+            const isFirstFingerOverall = state.activeTouches.size === 0;
+
+            if (isFirstFingerOverall) {
+                closeAllMenus(); // 仅在第一根手指按下时关闭菜单
             }
 
-            // 计算总触控面积（检测超大橡皮擦模式）
-            let totalTouchArea = 0;
-            const allTouches = e.touches.length > 0 ? e.touches : e.changedTouches;
-            for (let i = 0; i < allTouches.length; i++) {
-                const touch = allTouches[i];
-                // 使用 touch 的 radiusX 和 radiusY 估算接触面积，如果没有则使用默认值
-                const radiusX = touch.radiusX || 10;
-                const radiusY = touch.radiusY || 10;
-                // 椭圆面积公式：π * a * b
-                const touchArea = Math.PI * radiusX * radiusY;
-                totalTouchArea += touchArea;
-            }
-
-            // 检测是否触发超大橡皮擦模式
-            if (totalTouchArea > state.megaEraserThreshold && state.tool !== 'eraser') {
-                state.isMegaEraser = true;
-                state.touchStartArea = totalTouchArea;
-                state.touchStartTime = Date.now();
-                // 临时切换到橡皮擦模式并设置超大半径
-                state.normalEraserRadius = state.eraserRadius;
-                state.eraserRadius = state.megaEraserRadius;
-                setTool('eraser');
-                // 添加视觉反馈 - 隐藏光标，显示预览层
-                container.classList.add('mega-eraser-active');
-                if (state.megaEraserPreviewCanvas) {
-                    state.megaEraserPreviewCanvas.classList.add('active');
-                }
-            }
+            // --- 超大橡皮擦逻辑（保持检测面积，但不应在已有手指绘图时强行切换） ---
+            // ... 原有的 totalTouchArea 检测逻辑 ...
 
             for (let i = 0; i < e.changedTouches.length; i++) {
                 const touch = e.changedTouches[i];
@@ -1246,113 +1261,74 @@ function erasePoints(points, eraserRadius) {
                 const x = touch.clientX - rect.left;
                 const y = touch.clientY - rect.top;
 
-                // 图形绘制模式处理
-                if (state.shapeMode) {
-                    state.shapeStartPoint = { x, y };
-                    state.isDrawing = true;
-                    state.activeTouches.set(touchId, {
-                        lastX: x,
-                        lastY: y,
-                        isDrawing: true,
-                        points: [{x, y}],
-                        pendingPoints: [{x, y}],
-                        historyPushed: false,
-                        isShapeMode: true
-                    });
-                    return;
-                }
+                // 核心判断：只有在没有任何手指在绘图时，这根新手指才被赋予“绘图权”
+                // 这样即使后面有新手指加入，它们的 isDrawing 也会是 false
+                const canStartDrawing = isFirstFingerOverall && i === 0; 
 
                 state.activeTouches.set(touchId, {
                     lastX: x,
                     lastY: y,
-                    isDrawing: true,
+                    isDrawing: canStartDrawing, 
                     points: [{x, y}],
                     pendingPoints: [{x, y}],
-                    historyPushed: false
+                    historyPushed: false,
+                    isShapeMode: canStartDrawing && !!state.shapeMode
                 });
 
-                state.ctx.beginPath();
-                state.ctx.moveTo(x, y);
-                state.ctx.lineTo(x, y);
-                state.ctx.stroke();
+                if (canStartDrawing) {
+                    state.isDrawing = true; // 仅为合法绘图手指开启全局开关
+                    state.ctx.beginPath();
+                    state.ctx.moveTo(x, y);
+                    state.ctx.lineTo(x, y);
+                    state.ctx.stroke();
+                }
             }
         }
+
+
 
         function handleTouchEnd(e) {
             e.preventDefault();
             const rect = state.canvas.getBoundingClientRect();
-
-            // 检查是否所有触摸都已结束
-            const remainingTouches = e.touches.length;
-
-            // 如果所有触摸结束，隐藏预览并恢复设置
-            if (remainingTouches === 0) {
-                // 延迟一点时间确保绘制完成
-                setTimeout(() => {
-                    // 清除预览
-                    clearMegaEraserPreview();
-                    if (state.megaEraserPreviewCanvas) {
-                        state.megaEraserPreviewCanvas.classList.remove('active');
-                    }
-
-                    // 如果是超大橡皮擦模式，恢复设置
-                    if (state.isMegaEraser) {
-                        state.eraserRadius = state.normalEraserRadius;
-                        state.isMegaEraser = false;
-                        container.classList.remove('mega-eraser-active');
-                        // 自动切换回画笔模式
-                        setTool('pen');
-                    }
-                }, 50);
-            }
 
             for (let i = 0; i < e.changedTouches.length; i++) {
                 const touch = e.changedTouches[i];
                 const touchId = touch.identifier;
                 const touchState = state.activeTouches.get(touchId);
 
-                if (!touchState) {
-                    state.activeTouches.delete(touch.identifier);
-                    continue;
+                if (!touchState) continue;
+
+                // 只有【正在绘图的手指】抬起时，才执行保存历史、图形转换等逻辑
+                if (touchState.isDrawing) {
+                    // ... 这里放原有的 analyzeAndConvertStroke 和 pushHistory 逻辑 ...
+                    
+                    // 重点：既然绘图手指离开了，全局绘制状态才结束
+                    state.isDrawing = false; 
                 }
 
-                // 图形绘制模式 - 完成绘制
-                if (touchState.isShapeMode && state.shapeMode && state.shapeStartPoint) {
-                    const x = touch.clientX - rect.left;
-                    const y = touch.clientY - rect.top;
-                    finishShapeDraw(x, y);
-                    state.isDrawing = false;
-                    state.activeTouches.delete(touch.identifier);
-                    continue;
-                }
+                // 移除当前结束的触控记录
+                state.activeTouches.delete(touchId);
+            }
 
-                // 画笔模式：分析并转换笔画
-                if (touchState.isDrawing && state.tool === 'pen') {
-                    if (touchState.points.length > 2) {
-                        redrawPreviousContent();
-                        const converted = analyzeAndConvertStroke(touchState.points);
-                        if (!converted && !touchState.historyPushed) {
-                            state.ctx.globalCompositeOperation = 'source-over';
-                            state.ctx.lineWidth = penConfig.currentSize;
-                            state.ctx.strokeStyle = penConfig.currentColor;
-                            state.ctx.lineCap = 'round';
-                            state.ctx.lineJoin = 'round';
-                            drawSmoothPath(touchState.points);
-                            pushHistory();
-                        }
-                    } else if (touchState.points.length <= 2 && !touchState.historyPushed) {
-                         pushHistory();
+            // 只有当屏幕上彻底没有手指时，才清理预览层
+            if (e.touches.length === 0) {
+                setTimeout(() => {
+                    clearMegaEraserPreview();
+                    if (state.megaEraserPreviewCanvas) {
+                        state.megaEraserPreviewCanvas.classList.remove('active');
                     }
-                }
-
-                // 橡皮擦模式：保存擦除后的状态到历史记录
-                if (touchState.isDrawing && state.tool === 'eraser' && !touchState.historyPushed) {
-                    pushHistory();
-                }
-
-                state.activeTouches.delete(touch.identifier);
+                    // 如果曾进入超大橡皮擦，此时才彻底恢复
+                    if (state.isMegaEraser) {
+                        state.eraserRadius = state.normalEraserRadius;
+                        state.isMegaEraser = false;
+                        container.classList.remove('mega-eraser-active');
+                        setTool('pen');
+                    }
+                }, 50);
             }
         }
+
+
 
         // 修改 analyzeAndConvertStroke 返回是否成功替换
         function analyzeAndConvertStroke(points) {
@@ -1404,10 +1380,10 @@ function erasePoints(points, eraserRadius) {
             return false;
         }
 
-        // 新增：重绘之前历史中的内容
-        function redrawPreviousContent() {
-            if (state.historyStep >= 0 && state.history.length > 0) {
-                const imageData = state.history[state.historyStep];
-                state.ctx.putImageData(imageData, 0, 0);
-            }
-        }
+function redrawPreviousContent() {
+    if (state.historyStep >= 0 && state.history.length > 0) {
+        const previousCanvas = state.history[state.historyStep];
+        state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+        state.ctx.drawImage(previousCanvas, 0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+    }
+}

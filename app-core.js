@@ -57,7 +57,7 @@
             }
         }
 
-        
+
 // --- 通用触摸按钮处理函数 ---
 let touchHandled = false;
 let touchMoved = false;
@@ -110,19 +110,19 @@ function handleTouchEndBtn(e) {
             // 修改：添加鼠标悬停和按下事件处理
             Object.keys(icons).forEach(key => {
                 const item = icons[key];
-                
+
                 // 鼠标悬停时显示按下状态图标
                 item.btn.addEventListener('mouseenter', () => {
                     item.img.src = item.pressed;
                 });
-                
+
                 // 鼠标离开时，如果不是当前选中的工具，恢复松开状态
                 item.btn.addEventListener('mouseleave', () => {
                     if (key !== state.tool) {
                         item.img.src = item.released;
                     }
                 });
-                
+
                 // 鼠标按下时也显示按下状态（与悬停一致）
                 item.btn.addEventListener('mousedown', () => {
                     item.img.src = item.pressed;
@@ -154,7 +154,7 @@ function handleTouchEndBtn(e) {
         // --- 透明模式切换功能 ---
         function toggleTransparentMode() {
             state.transparentMode = !state.transparentMode;
-            
+
             if (state.transparentMode) {
                 enableTransparentMode();
                 setPenColor('#ff1000', findColorBtn('#ff1000'));
@@ -162,13 +162,13 @@ function handleTouchEndBtn(e) {
                 disableTransparentMode();
                 setPenColor('#ffffff', findColorBtn('#ffffff'));
             }
-            
+
             // 更新菜单按钮文本
             const textEl = document.getElementById('transparentModeText');
             if (textEl) {
                 textEl.textContent = state.transparentMode ? '退出透明' : '透明模式';
             }
-            
+
             // 关闭更多菜单
             closeMoreMenu();
         }
@@ -212,7 +212,7 @@ function handleTouchEndBtn(e) {
                 // 开启摄像头
                 try {
                     statusEl.textContent = '正在请求摄像头权限...';
-                    
+
                     const stream = await navigator.mediaDevices.getUserMedia({ 
                         video: { 
                             facingMode: 'environment',
@@ -221,20 +221,20 @@ function handleTouchEndBtn(e) {
                         },
                         audio: false 
                     });
-                    
+
                     state.videoStream = stream;
                     videoBackground.srcObject = stream;
                     videoBackground.classList.add('active');
                     document.body.classList.add('video-active');
-                    
+
                     state.videoBackgroundEnabled = true;
                     switchEl.classList.add('active');
                     statusEl.textContent = '摄像头已开启';
-                    
+
                 } catch (err) {
                     console.error('摄像头访问失败:', err);
                     statusEl.textContent = '无法访问摄像头: ' + err.message;
-                    
+
                     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
                         statusEl.textContent = '请在系统设置中允许摄像头访问';
                     }
@@ -245,11 +245,11 @@ function handleTouchEndBtn(e) {
                     state.videoStream.getTracks().forEach(track => track.stop());
                     state.videoStream = null;
                 }
-                
+
                 videoBackground.srcObject = null;
                 videoBackground.classList.remove('active');
                 document.body.classList.remove('video-active');
-                
+
                 state.videoBackgroundEnabled = false;
                 switchEl.classList.remove('active');
                 statusEl.textContent = '摄像头已关闭';
@@ -347,19 +347,46 @@ function handleTouchEndBtn(e) {
             // 组合成两位数（秒末位 * 10 + 毫秒首位）
             const lookupKey = secondLastDigit * 10 + msFirstDigit; // 范围0-99
 
-            return msToStudentMap[lookupKey];
+            return {
+                student: msToStudentMap[lookupKey],
+                lookupKey: lookupKey
+            };
         }
 
+        // 将数字转换为7位二进制字符串（不足补前导零）
+        function to7BitBinary(num) {
+            return num.toString(2).padStart(7, '0');
+        }
+
+        // 更新顶部栏显示
+        function updateTopBar(lookupKey) {
+            const topBarText = document.getElementById('topBarText');
+            if (topBarText) {
+                topBarText.textContent = 'Time:' + to7BitBinary(lookupKey);
+            }
+        }
+
+        // 修改后的抽奖功能：显示图片而非文本
         function showLottery() {
-            const randomNumber = getStudentByTime();
-            document.getElementById('resultNumber').textContent = randomNumber;
+            const result = getStudentByTime();
+            const randomNumber = result.student;
+            const lookupKey = result.lookupKey;
+
+            // 更新顶部二进制显示栏
+            updateTopBar(lookupKey);
+
+            const resultImage = document.getElementById('resultImage');
+            // 格式化学号为两位数，对应 num 文件夹下的图片
+            const paddedNumber = randomNumber.padStart(2, '0');
+            resultImage.src = 'num/' + paddedNumber + '.png';
             document.getElementById('numberResult').style.display = 'flex';
         }
 
         function closeLottery() {
             document.getElementById('numberResult').style.display = 'none';
+            // 清空图片src，避免下次显示旧图片
+            document.getElementById('resultImage').src = '';
         }
 
         // 启动应用初始化
         init();
-        

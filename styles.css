@@ -12,6 +12,46 @@ body {
     height: 100vh;
 }
 
+/* 顶部二进制显示栏（仅在抽奖结果界面显示） */
+.top-bar {
+    position: relative;
+    z-index: 3;
+    width: 300px;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 40px;
+    margin-bottom: 16px;
+    flex-shrink: 0;
+}
+
+.top-bar-bg {
+    width: 300px;
+    height: auto;
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+.top-bar-text {
+    position: relative;
+    z-index: 2;
+    color: #ffffff;
+    font-size: 22px;
+    font-family: '小米兰亭 Pro Normal', '小米兰亭pro正常版', 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9);
+    padding: 12px 0;
+    pointer-events: none;
+    user-select: none;
+}
+
+
+
 /* 透明背景模式 */
 body.transparent-mode {
     background-color: transparent !important;
@@ -145,57 +185,40 @@ canvas {
 }
 .modal-content { animation: popIn 0.1s ease-out; }
 
+/* 修改后的抽奖结果界面样式 */
 .number-result {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,.55);
+    background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(8px);
     z-index: 101;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
     flex-direction: column;
+    padding: 0;
+    margin: 0;
 }
 
 /* 透明模式下抽奖结果背景也调整为半透明 */
 body.transparent-mode .number-result {
-    background: rgba(0,0,0,0.3);
+    background: rgba(255, 255, 255, 0.2);
 }
 
-.result-number {
-    font-size: 8rem;
-    font-weight: 500;
-    color: #FFF;
-    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'segoe ui';
+/* 抽奖结果图片：宽度占满屏幕，保持比例 */
+.result-image {
+    width: auto;
+    height: auto;
+    max-width: 100vw;
+    max-height: 70vh;
+    object-fit: contain;
     position: relative;
     z-index: 2;
-}
-
-.result-number::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -48%);
-    width: 150rem;
-    height: 52%;
-    background-color: #ffc0cb;
-    z-index: -1;
-    border-radius: 0;
-}
-
-@keyframes numberAppear {
-    0% { transform: scale(1.2); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
-}
-
-.result-tip {
-    margin-top: 2rem;
-    font-size: .9rem;
-    color: rgba(255,255,255,.7);
-    letter-spacing: 1px;
+    user-select: none;
     pointer-events: none;
-    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    flex-shrink: 0;
+    margin-top: 15%;
+    margin-bottom: auto;
 }
 
 .result-close-layer {
@@ -203,12 +226,6 @@ body.transparent-mode .number-result {
     inset: 0;
     z-index: 1;
     cursor: pointer;
-}
-
-.result-number, .result-tip {
-    position: relative;
-    z-index: 2;
-    pointer-events: none;
 }
 
 .pen-menu {
@@ -868,6 +885,156 @@ body.video-active #canvas-container {
 }
 
 /* 确保UI元素在顶层 */
+.toolbar, .fixed.bottom-3 {
+    z-index: 100;
+}
+
+/* 版本号文字在透明模式下增加阴影提高可读性 */
+body.transparent-mode .fixed.bottom-3.left-4 {
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+/* ========== 新版弹窗样式（来自弹窗.html） ========== */
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+.overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.popup {
+    width: 600px;
+    height: 450px;
+    position: relative;
+    border-radius: 15px;
+    border: 1px solid rgba(170, 170, 170, 0.5);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(80px) scale(0.9);
+}
+.popup.entering {
+    animation: popupIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.popup.leaving {
+    animation: popupOut 0.5s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+@keyframes popupIn {
+    0% {
+        transform: translateY(80px) scale(0.9);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes popupOut {
+    0% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+    10% {
+        transform: translateY(0) scale(1);
+        opacity: 0;
+    }
+    20% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+    30% {
+        transform: translateY(0) scale(1);
+        opacity: 0;
+    }
+    40% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(60px) scale(0.9);
+        opacity: 0;
+    }
+}
+
+.popup-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+}
+
+/* 关闭按钮: 62x58 右上角, 透明仅保留判定区 */
+.close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 62px;
+    height: 58px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+}
+
+/* 文本容器: 全宽, top 59px, bottom 125px */
+.text-container {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 59px;
+    bottom: 100px;
+    padding: 20px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #37393c;
+    font-size: 24px;
+    font-family: '原装经典OS黑体', 'PingFang SC', 'Microsoft YaHei', sans-serif !important;
+    z-index: 5;
+    overflow-y: auto;
+}
+
+/* 取消按钮: 37,340 -> 295,410, 透明仅保留判定区 */
+.btn-cancel {
+    position: absolute;
+    left: 37px;
+    top: 340px;
+    width: 258px;
+    height: 70px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+}
+
+/* 确认按钮: 309,340 -> 567,410, 透明仅保留判定区 */
+.btn-ok {
+    position: absolute;
+    left: 309px;
+    top: 340px;
+    width: 258px;
+    height: 70px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+}
 .toolbar, .fixed.bottom-3 {
     z-index: 100;
 }

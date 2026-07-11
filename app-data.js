@@ -26,7 +26,7 @@
             isDrawing: false,
             currentPage: 0,
             pages: [],
-            perfWarningThreshold: 15,
+            perfWarningThreshold: 25,
             history: [],
             historyStep: -1,
             eraserRadius: 25,
@@ -93,8 +93,6 @@
         // --- DOM Elements ---
         const container = document.getElementById('canvas-container');
         const pageIndicator = document.getElementById('pageIndicator');
-        const clearConfirmBar = document.getElementById('clearConfirmBar');
-        const perfWarningBar = document.getElementById('perfWarningBar');
         const penMenu = document.getElementById('penMenu');
         const moreMenu = document.getElementById('moreMenu');
         const videoMenu = document.getElementById('videoMenu');
