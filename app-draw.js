@@ -244,6 +244,9 @@
             closePenMenu();
             closeMoreMenu();
             closeVideoMenu();
+            if (typeof closeEraserMenu === 'function' && state.eraserMenuOpen) {
+                closeEraserMenu();
+            }
         }
 
         // 点击外部关闭菜单
@@ -259,6 +262,10 @@
             // 关闭视频菜单
             if (state.videoMenuOpen && !e.target.closest('#btn-video') && !e.target.closest('#videoMenu')) {
                 closeVideoMenu();
+            }
+            // 关闭橡皮擦菜单
+            if (state.eraserMenuOpen && !e.target.closest('#tool-eraser') && !e.target.closest('#eraserMenu')) {
+                closeEraserMenu();
             }
         });
 
@@ -816,6 +823,11 @@ function handleTouchMove(e) {
             state.tool = toolName;
             updateToolIcons();
 
+            // 切到橡皮擦之外的工具时，关闭滑动清空菜单
+            if (toolName !== 'eraser' && typeof closeEraserMenu === 'function' && state.eraserMenuOpen) {
+                closeEraserMenu();
+            }
+
             container.className = toolName === 'pen' ? 
                 'cursor-pen w-full h-full fixed inset-0' : 
                 'cursor-eraser-active w-full h-full fixed inset-0';
@@ -947,13 +959,27 @@ function undo() {
         }
 
         function executeClear() {
-            if (state.ctx && state.canvas) {
-                state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+            if (!state.ctx || !state.canvas) {
+                closeClearModal();
+                return;
+            }
+
+            const canvas = state.canvas;
+            canvas.classList.remove('canvas-clear-animating');
+            void canvas.offsetWidth;
+            canvas.classList.add('canvas-clear-animating');
+
+            // 动画结束后再清空像素，确保模糊渐隐过程可见。
+            const finishClear = function() {
+                canvas.classList.remove('canvas-clear-animating');
+                state.ctx.clearRect(0, 0, canvas.width / state.dpr, canvas.height / state.dpr);
                 state.history = [];
                 state.historyStep = -1;
                 state.circles = []; // 清空圆信息
                 state.lines = []; // 清空直线端点信息
-            }
+            };
+
+            canvas.addEventListener('animationend', finishClear, { once: true });
             closeClearModal();
         }
 
@@ -1252,8 +1278,31 @@ function undo() {
                 closeAllMenus(); // 仅在第一根手指按下时关闭菜单
             }
 
-            // --- 超大橡皮擦逻辑（保持检测面积，但不应在已有手指绘图时强行切换） ---
-            // ... 原有的 totalTouchArea 检测逻辑 ...
+            // --- 超大橡皮擦逻辑：仅在第一根手指按下、且当前为橡皮擦或笔工具时检测 ---
+            // 希沃一体机红外触屏手掌/多指接触面积远大于普通指尖，据此触发超大橡皮擦
+            if (isFirstFingerOverall && (state.tool === 'eraser' || state.tool === 'pen') && !state.isMegaEraser) {
+                let totalTouchArea = 0;
+                for (let i = 0; i < e.touches.length; i++) {
+                    const t = e.touches[i];
+                    const rx = t.radiusX || 0;
+                    const ry = t.radiusY || 0;
+                    if (rx > 0 && ry > 0) {
+                        totalTouchArea += Math.PI * rx * ry;
+                    } else {
+                        // 触屏不报告接触半径时按普通指尖估算（半径约10px）
+                        totalTouchArea += Math.PI * 10 * 10;
+                    }
+                }
+                // 接触面积超限，或同时落下3根及以上手指（手掌特征），均判定为超大橡皮擦
+                if (totalTouchArea > state.megaEraserThreshold || e.touches.length >= 3) {
+                    state.isMegaEraser = true;
+                    state.eraserRadius = state.megaEraserRadius;
+                    container.classList.add('mega-eraser-active');
+                    if (state.megaEraserPreviewCanvas) {
+                        state.megaEraserPreviewCanvas.classList.add('active');
+                    }
+                }
+            }
 
             for (let i = 0; i < e.changedTouches.length; i++) {
                 const touch = e.changedTouches[i];
@@ -1300,10 +1349,23 @@ function undo() {
 
                 // 只有【正在绘图的手指】抬起时，才执行保存历史、图形转换等逻辑
                 if (touchState.isDrawing) {
-                    // ... 这里放原有的 analyzeAndConvertStroke 和 pushHistory 逻辑 ...
-                    
+                    if (touchState.isShapeMode && state.shapeMode && state.shapeStartPoint) {
+                        // 图形绘制模式（圆/直线/虚线）：完成绘制并落笔
+                        finishShapeDraw(touchState.lastX, touchState.lastY);
+                    } else if (state.tool === 'pen') {
+                        // 画笔模式：自动校正分析（直线/圆替换）
+                        const converted = analyzeAndConvertStroke(touchState.points);
+                        // 未被自动替换的手绘笔迹也需要存入历史，保证可撤回
+                        if (!converted) {
+                            pushHistory();
+                        }
+                    } else if (state.tool === 'eraser' || state.isMegaEraser) {
+                        // 橡皮擦模式（含超大橡皮擦）：保存擦除后的状态
+                        pushHistory();
+                    }
+
                     // 重点：既然绘图手指离开了，全局绘制状态才结束
-                    state.isDrawing = false; 
+                    state.isDrawing = false;
                 }
 
                 // 移除当前结束的触控记录
@@ -1317,12 +1379,11 @@ function undo() {
                     if (state.megaEraserPreviewCanvas) {
                         state.megaEraserPreviewCanvas.classList.remove('active');
                     }
-                    // 如果曾进入超大橡皮擦，此时才彻底恢复
+                    // 如果曾进入超大橡皮擦，此时才彻底恢复（保持橡皮擦工具不变）
                     if (state.isMegaEraser) {
                         state.eraserRadius = state.normalEraserRadius;
                         state.isMegaEraser = false;
                         container.classList.remove('mega-eraser-active');
-                        setTool('pen');
                     }
                 }, 50);
             }

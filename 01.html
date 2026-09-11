@@ -92,9 +92,20 @@
             </div>
         </div>
 
-        <button id="tool-eraser" class="tool-btn" onclick="setTool('eraser')" ontouchstart="handleEraserTouch(event)">
-            <img id="img-eraser" src="icon/橡皮-松开.png" alt="橡皮">
-        </button>
+        <div style="position: relative;">
+            <button id="tool-eraser" class="tool-btn" onclick="handleEraserClick()" ontouchstart="handleEraserTouch(event)">
+                <img id="img-eraser" src="icon/橡皮-松开.png" alt="橡皮">
+            </button>
+            <!-- 橡皮擦设置菜单：选中橡皮后再次点击显示 -->
+            <div id="eraserMenu" class="eraser-menu" onclick="event.stopPropagation()">
+                <div class="slider-clear">
+                    <div class="slider-clear-track" id="sliderClearTrack">
+                        <div class="slider-clear-knob" id="sliderClearKnob">&#10148;</div>
+                    </div>
+                    <div class="slider-clear-label">滑动以清空</div>
+                </div>
+            </div>
+        </div>
 
         <button id="btn-undo" class="tool-btn" onclick="undo()" ontouchstart="handleUndoTouch(event)">
             <img id="img-undo" src="icon/撤回-松开.png" alt="撤回">
@@ -213,16 +224,17 @@
         </div>
     </div>
 
-    <!-- 修改后的抽奖结果界面：显示图片而非文本 -->
+
     <div class="number-result" id="numberResult">
         <div class="result-close-layer" id="resultCloseLayer"></div>
-        <!-- 顶部二进制显示栏（仅在抽奖界面显示） -->
+        <video id="lotterySpecialVideo" preload="auto" style="display:none;position:absolute;inset:0;z-index:4;max-width:100vw;max-height:100vh;margin:auto;" playsinline></video>
         <div id="topBar" class="top-bar">
             <img src="bar.png" alt="bar" class="top-bar-bg">
             <span id="topBarText" class="top-bar-text">Time:0000000</span>
         </div>
         <img id="resultImage" class="result-image" src="" alt="抽奖结果">
     </div>
+
 
     <!-- 关于对话框 - 新样式 -->
     <div id="aboutDialog" class="about-dialog" onclick="closeAboutOnOverlay(event)">
@@ -295,7 +307,7 @@
         })();
     </script>
 
-    <div class="fixed bottom-3 left-4 text-white/50 text-sm z-50">   行知实验校内测试版 v2.6.0</div>
+    <div class="fixed bottom-3 left-4 text-white/50 text-sm z-50">   测试版 v2.6.0</div>
 
 </body>
 </html>
