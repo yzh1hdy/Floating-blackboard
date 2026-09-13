@@ -1,4 +1,4 @@
-// --- 网格线功能 ---
+        // --- 实际上不需要但影响运行的网格线功能 ---
         function createGridCanvas() {
             const dpr = window.devicePixelRatio || 1;
             const rect = container.getBoundingClientRect();
@@ -414,7 +414,7 @@
                 const dy = y - circle.y;
                 const distToCenter = Math.sqrt(dx * dx + dy * dy);
 
-                // 检查是否接近圆心
+                // 检查是否接近���心
                 if (distToCenter < snapThreshold) {
                     snappedX = circle.x;
                     snappedY = circle.y;
@@ -741,7 +741,7 @@ function handleTouchMove(e) {
             continue;
         }
 
-        // 3. 平滑绘制逻辑
+        // 3. 触屏绘制过程中只绘制原始折线，抬手后再统一平滑
         if (state.tool === 'pen') {
             state.ctx.globalCompositeOperation = 'source-over';
             state.ctx.lineWidth = penConfig.currentSize;
@@ -749,41 +749,12 @@ function handleTouchMove(e) {
             state.ctx.lineCap = 'round';
             state.ctx.lineJoin = 'round';
 
-            // 存入当前点
             touchState.points.push({ x, y });
+            state.ctx.beginPath();
+            state.ctx.moveTo(touchState.lastX, touchState.lastY);
+            state.ctx.lineTo(x, y);
+            state.ctx.stroke();
 
-            // 必须至少有 3 个点才能计算出平滑的贝塞尔曲线
-            if (touchState.points.length > 2) {
-                const points = touchState.points;
-                const lastIdx = points.length - 1;
-                
-                // 计算倒数第二个点和当前点的中点作为终点
-                const midPoint = {
-                    x: (points[lastIdx - 1].x + points[lastIdx].x) / 2,
-                    y: (points[lastIdx - 1].y + points[lastIdx].y) / 2
-                };
-
-                state.ctx.beginPath();
-                // 从上一次计算的中点开始（为了保持路径连续，我们需要存储上一个中点）
-                // 如果没有存储上一个中点，可以使用 points[lastIdx - 2] 与 points[lastIdx - 1] 的中点
-                const prevMidPoint = {
-                    x: (points[lastIdx - 2].x + points[lastIdx - 1].x) / 2,
-                    y: (points[lastIdx - 2].y + points[lastIdx - 1].y) / 2
-                };
-
-                state.ctx.moveTo(prevMidPoint.x, prevMidPoint.y);
-                // 控制点是 points[lastIdx - 1]，终点是当前的中点
-                state.ctx.quadraticCurveTo(points[lastIdx - 1].x, points[lastIdx - 1].y, midPoint.x, midPoint.y);
-                state.ctx.stroke();
-            } else {
-                // 点数不足 3 个时（刚开始画），先做简单的连线
-                state.ctx.beginPath();
-                state.ctx.moveTo(touchState.lastX, touchState.lastY);
-                state.ctx.lineTo(x, y);
-                state.ctx.stroke();
-            }
-
-            // 更新最后位置
             touchState.lastX = x;
             touchState.lastY = y;
 
@@ -1353,10 +1324,16 @@ function undo() {
                         // 图形绘制模式（圆/直线/虚线）：完成绘制并落笔
                         finishShapeDraw(touchState.lastX, touchState.lastY);
                     } else if (state.tool === 'pen') {
-                        // 画笔模式：自动校正分析（直线/圆替换）
+                        // 触屏抬手后才移除原始折线，并统一执行平滑与自动校正
+                        redrawPreviousContent();
                         const converted = analyzeAndConvertStroke(touchState.points);
-                        // 未被自动替换的手绘笔迹也需要存入历史，保证可撤回
                         if (!converted) {
+                            state.ctx.globalCompositeOperation = 'source-over';
+                            state.ctx.lineWidth = penConfig.currentSize;
+                            state.ctx.strokeStyle = penConfig.currentColor;
+                            state.ctx.lineCap = 'round';
+                            state.ctx.lineJoin = 'round';
+                            drawSmoothPath(touchState.points);
                             pushHistory();
                         }
                     } else if (state.tool === 'eraser' || state.isMegaEraser) {
@@ -1441,10 +1418,12 @@ function undo() {
             return false;
         }
 
-function redrawPreviousContent() {
-    if (state.historyStep >= 0 && state.history.length > 0) {
-        const previousCanvas = state.history[state.historyStep];
-        state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
-        state.ctx.drawImage(previousCanvas, 0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
-    }
-}
+        function redrawPreviousContent() {
+            // 即使没有历史记录，也必须先清除本次绘制的原始笔迹。
+            state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+
+            if (state.historyStep >= 0 && state.history.length > 0) {
+                const previousCanvas = state.history[state.historyStep];
+                state.ctx.drawImage(previousCanvas, 0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
+            }
+        }

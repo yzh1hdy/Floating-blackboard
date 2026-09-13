@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LimeLight Lemonade Jam 切换交互</title>  <!-- 请勿修改标题-->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: transparent !important; }
+  .stage {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    cursor: pointer;
+    user-select: none;
+  }
+  .layer-bottom {
+    position: absolute;
+    inset: 0;
+    background: transparent center / cover no-repeat;
+  }
+  /* 动画窗口始终保持透明，桌面由窗口系统直接透出。
+     白板截图只用于 .slice-inner 的裁切内容，不能铺到底层。 */
+  .layer-bottom.has-screenshot {
+    background-image: none;
+    background-color: transparent;
+  }
+  .slice {
+    position: absolute;
+    top: 0;
+    width: 10%;
+    height: 100%;
+    clip-path: inset(0 100% 0 0);
+    transform: skewX(0deg);
+    transform-origin: 50% 50%;
+  }
+  .slice-inner {
+    /* 内层比切片更宽并居中：反向倾斜后仍能完整覆盖整个切片，避免斜边露出底层、形成双重裁切 */
+    position: absolute;
+    top: 0;
+    left: calc(-30vh);
+    width: calc(10vw + 60vh);
+    height: 100%;
+    background-image: var(--whiteboard-screenshot);
+    background-size: 100vw 100vh;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: transparent;
+    transform: skewX(0deg);
+    transform-origin: 50% 50%;
+  }
+  .bar {
+    position: absolute;
+    top: 0;
+    width: 0px;
+    height: 100%;
+    background: #fe9800;
+    transform: translateX(0px) skewX(0deg);
+    pointer-events: none;
+    transform-origin: left center;
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="layer-bottom"></div>
+  <div class="layer-top" id="topLayer"></div>
+</div>
+<script>
+(function () {
+  var stage = document.getElementById('stage');
+  var topLayer = document.getElementById('topLayer');
+  var busy = false;
+  var topShown = false;
+  var sliceCount = 10;       // 图片切片依旧保持10份竖切
+  var extraBarEachSide = 2;  // 【核心改动】每个切片两侧各增加2条橙色条，+4条，总bar=10+4=14
+  var totalBarCount = sliceCount + extraBarEachSide * 2;
+  var totalSliceCount = totalBarCount;
+  var firstSliceIndex = -extraBarEachSide;
+  var requestedAction = null;
+
+  function setScreenshot(url) {
+    var bottom = document.querySelector('.layer-bottom');
+    if (!bottom || !url) return;
+
+    // 先移除上一张截图，避免 WebView 在新图解码期间继续绘制旧画面。
+    // 动画窗口此时尚未显示，下一次显示只能看到新截图或透明背景。
+    stage.style.removeProperty('--whiteboard-screenshot');
+    bottom.classList.remove('has-screenshot');
+
+    // 先完整解码新截图，再替换 CSS 背景。否则 WebView 可能先绘制上一张
+    // 已缓存的截图，随后才异步解码新截图，造成关闭动画第一帧闪旧画面。
+    var decoded = new Image();
+    decoded.onload = function () {
+      stage.style.setProperty('--whiteboard-screenshot', 'url("' + url.replace(/"/g, '%22') + '")');
+      bottom.classList.add('has-screenshot');
+
+      // 强制浏览器提交新背景到渲染树后再通知宿主显示动画窗口。
+      void stage.offsetWidth;
+      requestAnimationFrame(function () {
+        void stage.offsetWidth;
+        if (window.chrome && window.chrome.webview) {
+          window.chrome.webview.postMessage('screenshotReady');
+        }
+      });
+    };
+    decoded.onerror = function () {
+      if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage('screenshotReady');
+      }
+    };
+    decoded.src = url;
+  }
+
+  function runAnimation(direction) {
+    if (busy) return;
+    busy = true;
+    if (direction === 'show') resetAll();
+    animate(direction, function () {
+      topShown = direction === 'show';
+      busy = false;
+      if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage(direction === 'show' ? 'animationShown' : 'animationHidden');
+      }
+    });
+  }
+
+  function handleWebViewMessage(event) {
+    var message = event.data || {};
+    if (typeof message === 'string') {
+      try { message = JSON.parse(message); } catch (_) { return; }
+    }
+    if (message.type === 'setScreenshot') setScreenshot(message.url);
+    if (message.type === 'animate') runAnimation(message.direction === 'hide' ? 'hide' : 'show');
+  }
+
+  window.addEventListener('message', handleWebViewMessage);
+  if (window.chrome && window.chrome.webview) {
+    window.chrome.webview.addEventListener('message', handleWebViewMessage);
+  }
+
+  // 动画参数
+  var duration = 380;       // 切片平移 + bar 平移阶段
+  var expandTime = 110;     // 出现拉宽 / 消失收缩
+  var slantDeg = 30;        // 裁切与橙色条倾斜角度：打开时向右 +30°，关闭时向左 -30°
+  // 线性动画速度（px/ms）：拉宽与收缩共用，速度恒定；
+  // 也是移动阶段“慢-快-慢”两端（慢）的速度，三段衔接处速度相同，观感连贯
+  var linearSpeed = 20 / expandTime;
+
+  // 记录bar归属：每个对象保存dom和绑定的slice索引，用来同步动画
+  var barList = [];
+
+  // ========== 创建扩展图片切片：两侧额外切片与额外bar一一对应 ==========
+  // 额外切片位于可视区域外，但会在倾斜裁切时覆盖图片边缘，避免两侧加线后出现空白。
+  for (var i = 0; i < totalSliceCount; i++) {
+    var imageIndex = firstSliceIndex + i;
+    var slice = document.createElement('div');
+    slice.className = 'slice';
+    slice.style.left = (imageIndex * 10) + '%';
+    topLayer.appendChild(slice);
+
+    var inner = document.createElement('div');
+    inner.className = 'slice-inner';
+    inner.style.backgroundPosition = 'calc(30vh - ' + (10 * imageIndex) + 'vw) center';
+    slice.appendChild(inner);
+
+    var bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.left = (imageIndex * 10) + '%';
+    stage.appendChild(bar);
+    barList.push({ dom: bar, bindSliceIndex: i });
+  }
+
+
+  var slices = topLayer.querySelectorAll('.slice');
+  var inners = topLayer.querySelectorAll('.slice-inner');
+  // 不再直接用 querySelectorAll 获取 bars，改用 barList 数组统一管理全部14条bar
+
+  // 移动阶段缓动：慢-快-慢，且起止速度 = linearSpeed（与前后两段线性动画速度一致）。
+  // 用三次多项式 s(t)=at³+bt²+ct 满足 s(0)=0、s(T)=D、s'(0)=s'(T)=linearSpeed，
+  // 返回归一化的位移比例 0~1（t 为已过毫秒数，D 为移动总距离 px）。
+  function moveEase(elapsedMs, distPx) {
+    var T = duration;
+    var v = linearSpeed;
+    if (elapsedMs > T) elapsedMs = T;
+    var a = 2 * (v * T - distPx) / (T * T * T);
+    if (a > 0) {
+      // 极小视口下移动距离不足以做出“慢-快-慢”，退化为匀速，仍保持速度衔接
+      return elapsedMs / T;
+    }
+    var b = -3 * (v * T - distPx) / (T * T);
+    return (a * elapsedMs * elapsedMs * elapsedMs + b * elapsedMs * elapsedMs + v * elapsedMs) / distPx;
+  }
+
+  // 设置某一切片的倾斜：外层 skewX(deg) 让裁切边界倾斜，内层 skewX(-deg) 抵消、图片内容保持正直
+  function setSlant(slice, inner, deg) {
+    slice.style.transform = 'skewX(' + deg + 'deg)';
+    inner.style.transform = 'skewX(' + (-deg) + 'deg)';
+  }
+
+  function resetAll() {
+    for (var bIdx = 0; bIdx < barList.length; bIdx++) {
+      var barItem = barList[bIdx];
+      var bar = barItem.dom;
+      bar.style.width = '0px';
+      bar.style.clipPath = 'inset(0 0 0 0)';
+      bar.style.transform = 'translateX(0px) skewX(0deg)';
+      bar.style.transformOrigin = 'left center';
+    }
+    for (var i = 0; i < totalSliceCount; i++) {
+      slices[i].style.clipPath = 'inset(0 100% 0 0)';
+      setSlant(slices[i], inners[i], 0);
+    }
+  }
+
+  function animate(direction, done) {
+    var start = null;
+
+    // 关闭时先单独提交一次最终倾斜状态，避免 transform 在 scaleX 动画中从正值插值到 -30°。
+    // 下一帧才开始宽度变化；这样倾斜是瞬间发生的，不会被看成动画的一部分。
+    if (direction === 'hide') {
+      // 关闭时不要先调用 resetAll：它会把已显示的正倾斜状态瞬间写成正角度，
+      // 随后再改成负角度，用户就会看到“先从正变斜”。直接从当前显示状态切到最���负倾斜。
+      for (var preIdx = 0; preIdx < barList.length; preIdx++) {
+        var preBar = barList[preIdx].dom;
+        // 先保持固定宽度并从左侧裁切，关闭动画第一阶段从右向左展开。
+        // 不改变 width 或 translateX，避免右边缘在展开过程中漂移。
+        preBar.style.width = '20px';
+        preBar.style.clipPath = 'inset(0 0 0 100%)';
+        preBar.style.transformOrigin = 'right center';
+        preBar.style.transform = 'translateX(10vw) skewX(' + (-slantDeg) + 'deg)';
+      }
+      for (var preSliceIdx = 0; preSliceIdx < totalSliceCount; preSliceIdx++) {
+        setSlant(slices[preSliceIdx], inners[preSliceIdx], -slantDeg);
+      }
+      void stage.offsetWidth;
+    }
+
+    var expandEnd = expandTime;
+    var sweepEnd = expandTime + duration;
+    var totalTime = expandTime + duration + expandTime;
+    // 移动总距离：10vw 对应的像素值（随视口宽度变化）
+    var distPx = 0.1 * window.innerWidth;
+
+    function frame(now) {
+      if (!start) start = now;
+      var elapsed = now - start;
+
+      // ===== 1、先更新原有10个图片切片的裁切&倾斜（和原版完全不变）=====
+      for (var i = 0; i < totalSliceCount; i++) {
+        if (direction === 'show') {
+          if (elapsed <= expandEnd) {
+            var expandP = Math.min(elapsed / expandTime, 1);
+            var deg = slantDeg;
+            slices[i].style.clipPath = 'inset(0 100% 0 0)';
+            setSlant(slices[i], inners[i], deg);
+          } else if (elapsed <= sweepEnd) {
+            var moveElap = elapsed - expandEnd;
+            var mp = moveEase(moveElap, distPx);
+            var deg = slantDeg;
+            slices[i].style.clipPath = 'inset(0 ' + ((1 - mp) * 100) + '% 0 0)';
+            setSlant(slices[i], inners[i], deg);
+          } else {
+            var shrinkElap = elapsed - sweepEnd;
+            var shrinkP = Math.min(shrinkElap / expandTime, 1);
+            // 橙色条收窄期间保持���斜；完全消失后在动画结束处瞬间回正
+            var deg = slantDeg;
+            slices[i].style.clipPath = 'inset(0 0 0 0)';
+            setSlant(slices[i], inners[i], deg);
+          }
+        } else {
+          var hideExpandEnd = expandTime;
+          var hideSweepEnd = expandTime + duration;
+          if (elapsed <= hideExpandEnd) {
+            var hideExpandP = Math.min(elapsed / expandTime, 1);
+            // 关闭时先瞬间倾斜，再开始橙色条展开动画
+            var deg = -slantDeg;
+            slices[i].style.clipPath = 'inset(0 0 0 0)';
+            setSlant(slices[i], inners[i], deg);
+          } else if (elapsed <= hideSweepEnd) {
+            var hideMoveElap = elapsed - hideExpandEnd;
+            var hmp = moveEase(hideMoveElap, distPx);
+            var deg = -slantDeg;
+            slices[i].style.clipPath = 'inset(0 ' + (hmp * 100) + '% 0 0)';
+            setSlant(slices[i], inners[i], deg);
+          } else {
+            var shrinkElap = elapsed - hideSweepEnd;
+            var shrinkP = Math.min(shrinkElap / expandTime, 1);
+            var deg = -slantDeg;
+            slices[i].style.clipPath = 'inset(0 100% 0 0)';
+            // 橙色条完全消失前保持倾斜，避免看到回正动画
+            setSlant(slices[i], inners[i], deg);
+          }
+        }
+      }
+
+      // ===== 2、遍历全部14条bar，根据绑定的slice索引同步动画样式【核心改动】=====
+      for (var bIdx = 0; bIdx < barList.length; bIdx++) {
+        var barItem = barList[bIdx];
+        var bar = barItem.dom;
+        var i = barItem.bindSliceIndex; // 绑定的切片编号，复用该切片���动画计算逻辑
+
+        if (direction === 'show') {
+          if (elapsed <= expandEnd) {
+            // 阶段1：左侧 0→20px 线性拉宽（速度恒定 = linearSpeed），裁切斜 30°
+            var expandP = Math.min(elapsed / expandTime, 1);
+            var deg = slantDeg;
+            bar.style.width = (expandP * 20) + 'px';
+            bar.style.transform = 'translateX(0px) skewX(' + deg + 'deg)';
+          } else if (elapsed <= sweepEnd) {
+            // 阶段2：0→10vw 右移（慢-快-慢），裁切边界与橙色条同向斜 30°，揭示切片
+            var moveElap = elapsed - expandEnd;
+            var mp = moveEase(moveElap, distPx);
+            var deg = slantDeg;
+            bar.style.width = '20px';
+            bar.style.transform = 'translateX(' + (mp * 10) + 'vw) skewX(' + deg + 'deg)';
+          } else {
+            // 阶段3：先保持倾斜并收窄消失，完全消失后在动画结束处瞬间回正
+            var shrinkElap = elapsed - sweepEnd;
+            var shrinkP = Math.min(shrinkElap / expandTime, 1);
+            var deg = slantDeg;
+            // 收缩只使用裁切，不再用 scaleX；这样倾斜几何不会随着收缩被重新计算，
+            // 橙色条会始终保持 -/＋30°，直到宽度为零后才瞬间复位。
+            bar.style.width = '20px';
+            // 打开动画最后阶段改为从左向右收缩，固定右边缘，方向与关闭时相反。
+            bar.style.transformOrigin = 'right center';
+            bar.style.clipPath = 'inset(0 0 0 ' + (shrinkP * 100) + '%)';
+            bar.style.transform = 'translateX(10vw) skewX(' + deg + 'deg)';
+          }
+        } else {
+          // 关闭：先在右侧位置 0→20px 线性拉宽出现 → 向左移动(10vw→0) → 左侧位置 20→0px 线性收缩消失
+          var hideExpandEnd = expandTime;
+          var hideSweepEnd = expandTime + duration;
+          if (elapsed <= hideExpandEnd) {
+            // 阶段1只保持已经瞬间切换完成的 -30°，绝不再从 scaleX(0) 展开。
+            // 否则浏览器会把“正角度 → 负角度”和展开混在同一段视觉变化里。
+            var deg = -slantDeg;
+            var hideExpandP = Math.min(elapsed / expandTime, 1);
+            // 固定 20px 宽度，只从左侧解除裁切，因此右边缘始终不动，
+            // 视觉上明确表现为从右向左拉宽。
+            bar.style.width = '20px';
+            bar.style.clipPath = 'inset(0 0 0 ' + ((1 - hideExpandP) * 100) + '%)';
+            bar.style.transformOrigin = 'right center';
+            bar.style.transform = 'translateX(10vw) skewX(' + deg + 'deg)';
+          } else if (elapsed <= hideSweepEnd) {
+            // 阶段2：10vw→0 左移（慢-快-慢），裁切与橙色条向左斜 -30°，从左向右遮蔽切片
+            var hideMoveElap = elapsed - hideExpandEnd;
+            var hmp = moveEase(hideMoveElap, distPx);
+            var deg = -slantDeg;
+            bar.style.width = '20px';
+            bar.style.transformOrigin = 'left center';
+            bar.style.transform = 'translateX(' + ((1 - hmp) * 10) + 'vw) skewX(' + deg + 'deg)';
+          } else {
+            // 阶段3：左侧 0px 处 20→0px 线性收缩（裁切已完全遮蔽，倾角保持 -30°，结束后复位）
+            var shrinkElap = elapsed - hideSweepEnd;
+            var shrinkP = Math.min(shrinkElap / expandTime, 1);
+            var deg = -slantDeg;
+            bar.style.width = '20px';
+            bar.style.transformOrigin = 'left center';
+            bar.style.clipPath = 'inset(0 ' + (shrinkP * 100) + '% 0 0)';
+            bar.style.transform = 'translateX(0px) skewX(' + deg + 'deg)';
+          }
+        }
+      }
+
+      if (elapsed < totalTime) {
+        requestAnimationFrame(frame);
+      } else {
+        // 先让最后��帧真��绘制：橙色条已消失，但倾斜仍保持不变。
+        // 下一帧才复位，确保回正是���间切换，而不是可见的动画。
+        for (var bIdx = 0; bIdx < barList.length; bIdx++) {
+          var barItem = barList[bIdx];
+          var bar = barItem.dom;
+          bar.style.width = '0px';
+          bar.style.clipPath = 'inset(0 100% 0 0)';
+          bar.style.transformOrigin = 'left center';
+          bar.style.transform = direction === 'show'
+            ? 'translateX(10vw) skewX(' + slantDeg + 'deg)'
+            : 'translateX(0px) skewX(' + (-slantDeg) + 'deg)';
+          void bar.offsetWidth;
+        }
+        // 先让零宽且保持倾斜的状态提交，再跨两个宏任务瞬间复位。
+        setTimeout(function () {
+          setTimeout(function () {
+            for (var resetIdx = 0; resetIdx < barList.length; resetIdx++) {
+              var resetBar = barList[resetIdx].dom;
+              resetBar.style.transform = 'translateX(0px) skewX(0deg)';
+            }
+            for (var j = 0; j < totalSliceCount; j++) {
+              slices[j].style.clipPath = direction === 'show'
+                ? 'inset(0 0 0 0)'
+                : 'inset(0 100% 0 0)';
+              setSlant(slices[j], inners[j], 0);
+            }
+            done();
+          }, 180);
+        }, 0);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  stage.addEventListener('click', function () {
+    runAnimation(topShown ? 'hide' : 'show');
+  });
+
+  resetAll();
+})();
+</script>
+</body>
+</html>

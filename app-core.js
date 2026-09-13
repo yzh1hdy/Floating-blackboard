@@ -518,7 +518,7 @@ function showLottery() {
 
     const paddedNumber = randomNumber.padStart(2, '0');
     const imagePath = 'num/' + paddedNumber + '.png';
-    const specialStudentList = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20'];
+    const specialStudentList = ['37','19'];
 
     // 移除旧回退文本
     const oldTextElement = document.getElementById('lotteryTextFallback');
@@ -545,7 +545,7 @@ function showLottery() {
     state.isPlayingSpecialVideo = false;
 
     if (specialStudentList.includes(paddedNumber)) {
-        // ====== 33 / 37：播放ba1.mp4，结束后才加载图片动画 ======
+        // ====== 放ba1.mp4，结束后才加载图片动画 ======
         specialVideo.src = "ba1.mp4";
         specialVideo.style.display = "block";
         numberResult.classList.add('video-playing');

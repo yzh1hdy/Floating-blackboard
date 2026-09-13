@@ -13,6 +13,23 @@ using System.Windows.Forms;
 
 namespace _01
 {
+    // 触摸反馈类型枚举
+    internal enum FEEDBACK_TYPE
+    {
+        FEEDBACK_TOUCH_CONTACTVISUALIZATION = 1,
+        FEEDBACK_TOUCH_TAP = 2,
+        FEEDBACK_TOUCH_DOUBLETAP = 3,
+        FEEDBACK_TOUCH_PRESSANDHOLD = 4,
+        FEEDBACK_TOUCH_RIGHTTAP = 5,
+        FEEDBACK_PEN_BARRELVISUALIZATION = 6,
+        FEEDBACK_PEN_TAP = 7,
+        FEEDBACK_PEN_DOUBLETAP = 8,
+        FEEDBACK_PEN_PRESSANDHOLD = 9,
+        FEEDBACK_PEN_RIGHTTAP = 10,
+        FEEDBACK_TOUCH_DRAG = 11,
+        FEEDBACK_PEN_DRAG = 12,
+    }
+
     public partial class FloatTimerForm : Form
     {
         private readonly string imgExpand;
@@ -21,15 +38,19 @@ namespace _01
 
         private WebView2 webView;
         private Form webLayer;
+        private WebView2 animationWebView;
+        private Form animationLayer;
+        private bool animationReady;
+        private TaskCompletionSource<bool>? screenshotReadySignal;
+        private bool transitionInProgress;
+        private bool hasWhiteboardScreenshot;
+        private string? lastWhiteboardScreenshotPath;
         private NotifyIcon trayIcon;
         private PictureBox btnToggle;
         private Form btnForm;
         private bool expanded = false;
         private readonly Point btnPos;
         private readonly Size btnSize;
-
-        // 记录任务栏状态变化时工作区（用于 Hide/Show 恢复）
-        private Rectangle _originalWorkArea;
 
         private readonly System.Windows.Forms.Timer topMostTimer;
         private readonly System.Windows.Forms.Timer focusCheckTimer;
@@ -88,9 +109,6 @@ namespace _01
 
             var scr = Screen.PrimaryScreen.WorkingArea;
             btnPos = new Point(scr.Left, scr.Bottom - btnSize.Height - 30);
-
-            // 记录原始工作区，以便任务栏隐藏后恢复
-            _originalWorkArea = Screen.PrimaryScreen.WorkingArea;
 
             #region 3. 按钮窗口：普通 TopMost + Region 镂空，可点击穿透
             btnForm = new Form
@@ -187,7 +205,7 @@ namespace _01
             catch { }
             #endregion
 
-            #region 8. 加载配置并初始化托盘菜单
+            #region 8. 加载配置并初���化托盘菜单
             LoadConfig();
             InitializeTrayIcon();
             #endregion
@@ -200,7 +218,9 @@ namespace _01
             InitializePerformanceMode();
             #endregion
 
-            this.FormClosing += FloatTimerForm_FormClosing;
+            // 移除启动完成通知
+            // ShowBalloonTip("Interactive Blackboard", "白板启动成功，可在托盘中操作");
+
         }
 
         #region 配置管理
@@ -595,11 +615,6 @@ namespace _01
             }
         }
 
-        private void FloatTimerForm_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            ShowTaskbar();
-        }
-
         private void ForceWebLayerTopMost()
         {
             if (webLayer == null || webLayer.IsDisposed || !webLayer.Visible) return;
@@ -729,10 +744,45 @@ namespace _01
 
             EmergencyReleaseMemory();
 
-            ShowTaskbar();
-
             btnForm?.Close();
             btnForm?.Dispose();
+        }
+        #endregion
+
+        #region 触摸反馈禁用
+        /// <summary>
+        /// 禁用窗口的触摸视觉反馈
+        /// </summary>
+        private void DisableTouchFeedback(IntPtr hWnd)
+        {
+            try
+            {
+                bool enabled = false;
+
+                // 禁用触摸接触可视化（小白圈）
+                SetWindowFeedbackSetting(hWnd, FEEDBACK_TYPE.FEEDBACK_TOUCH_CONTACTVISUALIZATION, 0, (uint)Marshal.SizeOf(enabled), ref enabled);
+
+                // 禁用触摸点击反馈
+                SetWindowFeedbackSetting(hWnd, FEEDBACK_TYPE.FEEDBACK_TOUCH_TAP, 0, (uint)Marshal.SizeOf(enabled), ref enabled);
+
+                // 禁用触摸双击反馈
+                SetWindowFeedbackSetting(hWnd, FEEDBACK_TYPE.FEEDBACK_TOUCH_DOUBLETAP, 0, (uint)Marshal.SizeOf(enabled), ref enabled);
+
+                // 禁用触摸长按反馈
+                SetWindowFeedbackSetting(hWnd, FEEDBACK_TYPE.FEEDBACK_TOUCH_PRESSANDHOLD, 0, (uint)Marshal.SizeOf(enabled), ref enabled);
+
+                // 禁用触摸右键反馈
+                SetWindowFeedbackSetting(hWnd, FEEDBACK_TYPE.FEEDBACK_TOUCH_RIGHTTAP, 0, (uint)Marshal.SizeOf(enabled), ref enabled);
+
+                // 禁用触摸拖动反馈
+                SetWindowFeedbackSetting(hWnd, FEEDBACK_TYPE.FEEDBACK_TOUCH_DRAG, 0, (uint)Marshal.SizeOf(enabled), ref enabled);
+
+                Debug.WriteLine("已禁用窗口触摸反馈");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"禁用触摸反馈失败: {ex.Message}");
+            }
         }
         #endregion
 
@@ -752,7 +802,7 @@ namespace _01
                 StartPosition = FormStartPosition.Manual
             };
 
-            // 避免任务栏保留区域导致底部不可点击，使用屏幕边界而非 Maxmized
+            // 使用屏幕边界而非 Maximized，确保底部可点击
             Rectangle screenBounds = Screen.PrimaryScreen.Bounds;
             webLayer.Bounds = screenBounds;
 
@@ -799,12 +849,9 @@ namespace _01
                         if (expanded)
                         {
                             expanded = false;
-                            webLayer?.Hide();
-                            // 显示btnForm并恢复展开按钮图片
-                            btnForm.Show();
-                            btnToggle.Image = Image.FromFile(imgExpand);
-                            SetButtonRegion(btnForm, (Bitmap)btnToggle.Image);
-                            ShowTaskbar();
+                            // 不要立即隐藏白板：先让动画层覆盖白板并播放关闭动画，
+                            // PlayTransitionAsync 会在动画开始后再隐藏 webLayer。
+                            _ = PlayTransitionAsync("hide");
                         }
                     }));
                 }
@@ -812,8 +859,198 @@ namespace _01
             catch { }
         }
 
+        private string ResolveHtmlPath(string fileName)
+        {
+            string basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
+            if (File.Exists(basePath)) return basePath;
+
+            string publicPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "public", fileName);
+            if (File.Exists(publicPath)) return publicPath;
+
+            return basePath;
+        }
+
+        private async Task CreateAnimationLayerAsync()
+        {
+            if (animationLayer != null && !animationLayer.IsDisposed && animationWebView?.CoreWebView2 != null)
+                return;
+
+            animationLayer = new Form
+            {
+                FormBorderStyle = FormBorderStyle.None,
+                TopMost = true,
+                ShowInTaskbar = false,
+                BackColor = Color.Magenta,
+                TransparencyKey = Color.Magenta,
+                StartPosition = FormStartPosition.Manual,
+                Bounds = Screen.PrimaryScreen.Bounds
+            };
+            animationWebView = new WebView2
+            {
+                Dock = DockStyle.Fill,
+                DefaultBackgroundColor = Color.Transparent
+            };
+            animationLayer.Controls.Add(animationWebView);
+            animationReady = false;
+
+            await animationWebView.EnsureCoreWebView2Async(_webViewEnvironment);
+            animationWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+            animationWebView.CoreWebView2.WebMessageReceived += AnimationWebMessageReceived;
+            animationWebView.CoreWebView2.NavigationCompleted += (sender, args) =>
+            {
+                if (args.IsSuccess) animationReady = true;
+            };
+            animationWebView.CoreWebView2.Navigate(new Uri(ResolveHtmlPath("1.html")).AbsoluteUri);
+
+            for (int i = 0; i < 100 && !animationReady; i++)
+                await Task.Delay(50);
+        }
+
+        private async Task<string?> CaptureWhiteboardAsync()
+        {
+            if (webView?.CoreWebView2 == null) return null;
+
+            string screenshotDirectory = Path.Combine(Path.GetTempPath(), "FloatTimerScreenshots");
+            Directory.CreateDirectory(screenshotDirectory);
+            string screenshotPath = Path.Combine(screenshotDirectory, $"whiteboard-{Guid.NewGuid():N}.png");
+
+            try
+            {
+                await using var stream = new FileStream(
+                    screenshotPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.Read,
+                    bufferSize: 64 * 1024,
+                    useAsync: true);
+                await webView.CoreWebView2.CapturePreviewAsync(
+                    CoreWebView2CapturePreviewImageFormat.Png,
+                    stream);
+                await stream.FlushAsync();
+                return screenshotPath;
+            }
+            catch
+            {
+                try { if (File.Exists(screenshotPath)) File.Delete(screenshotPath); } catch { }
+                return null;
+            }
+        }
+
+        private void DeleteWhiteboardScreenshot(string? screenshotPath)
+        {
+            if (string.IsNullOrEmpty(screenshotPath)) return;
+            try
+            {
+                if (File.Exists(screenshotPath)) File.Delete(screenshotPath);
+            }
+            catch (IOException)
+            {
+                // WebView2 仍在读取时由下一次截图或退出清理。
+            }
+        }
+
+        private void ClearWhiteboardScreenshot()
+        {
+            DeleteWhiteboardScreenshot(lastWhiteboardScreenshotPath);
+            lastWhiteboardScreenshotPath = null;
+            hasWhiteboardScreenshot = false;
+        }
+
+        private void AnimationWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+        {
+            try
+            {
+                if (e.TryGetWebMessageAsString() == "screenshotReady")
+                    screenshotReadySignal?.TrySetResult(true);
+            }
+            catch { }
+        }
+
+        private async Task PlayTransitionAsync(string direction)
+        {
+            if (transitionInProgress || webLayer == null || webView == null) return;
+            transitionInProgress = true;
+            try
+            {
+                await CreateAnimationLayerAsync();
+                if (animationWebView?.CoreWebView2 == null || !animationReady) return;
+
+                // 只在关闭白板时截取一次，并缓存这张截图。
+                // 后续展开直接复用上次关闭时的画面，不再先显示 01.html 进行截图。
+                if (direction == "hide")
+                {
+                    var screenshot = await CaptureWhiteboardAsync();
+                    if (screenshot != null)
+                    {
+                        string? previousScreenshotPath = lastWhiteboardScreenshotPath;
+                        lastWhiteboardScreenshotPath = screenshot;
+                        hasWhiteboardScreenshot = true;
+
+                        // 新截图完成后再删除旧文件，避免动画层仍在读取旧截图。
+                        DeleteWhiteboardScreenshot(previousScreenshotPath);
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(lastWhiteboardScreenshotPath))
+                {
+                    screenshotReadySignal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    animationWebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new
+                    {
+                        type = "setScreenshot",
+                        url = new Uri(lastWhiteboardScreenshotPath).AbsoluteUri
+                    }));
+                    await Task.WhenAny(screenshotReadySignal.Task, Task.Delay(500));
+                    screenshotReadySignal = null;
+                }
+
+                animationLayer.Bounds = Screen.PrimaryScreen.Bounds;
+                animationLayer.Show();
+                animationLayer.BringToFront();
+                SetWindowPos(animationLayer.Handle, HWND_TOPMOST, 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+
+                // 动画开始前切换窗口可见性：
+                // 打开时必须先隐藏白板，避免 01.html 盖住 1.html；
+                // 关闭时也先隐藏白板，让动画层完整接管画面。
+                webLayer.Hide();
+
+                animationWebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new
+                {
+                    type = "animate",
+                    direction = direction
+                }));
+
+                await Task.Delay(650);
+
+                // 先显示动画结束后的白板，再关闭动画层，避免两次窗口切换之间出现一帧桌面空白。
+                if (direction == "show")
+                {
+                    webLayer.Show();
+                    ForceWebLayerTopMost();
+                }
+                animationLayer.Hide();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"白板过渡动画失败: {ex.Message}");
+                if (direction == "hide") webLayer?.Hide();
+            }
+            finally
+            {
+                transitionInProgress = false;
+                if (direction == "hide")
+                {
+                    btnForm.Show();
+                    btnToggle.Image = Image.FromFile(imgExpand);
+                    SetButtonRegion(btnForm, (Bitmap)btnToggle.Image);
+                }
+            }
+        }
+
         private void DisposeWebLayer()
         {
+            ClearWhiteboardScreenshot();
+
             if (webView != null)
             {
                 try
@@ -827,14 +1064,20 @@ namespace _01
 
             if (webLayer != null)
             {
-                try
-                {
-                    webLayer.Hide();
-                    webLayer.Dispose();
-                }
-                catch { }
+                try { webLayer.Hide(); webLayer.Dispose(); } catch { }
                 webLayer = null;
             }
+            if (animationWebView != null)
+            {
+                try { animationWebView.Dispose(); } catch { }
+                animationWebView = null;
+            }
+            if (animationLayer != null)
+            {
+                try { animationLayer.Hide(); animationLayer.Dispose(); } catch { }
+                animationLayer = null;
+            }
+            animationReady = false;
         }
         #endregion
 
@@ -859,7 +1102,7 @@ namespace _01
 
             webView.CoreWebView2.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Dark;
 
-            string htmlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "01.html");
+            string htmlPath = ResolveHtmlPath("01.html");
             webView.CoreWebView2.Navigate(htmlPath);
         }
 
@@ -871,54 +1114,59 @@ namespace _01
             {
                 CreateWebLayer();
 
-                // 关键修改：展开后隐藏btnForm，不显示任何按钮
-                btnForm.Hide();
-
-                lock (_zOrderLock)
+                // 有缓存截图时，必须先保持 01.html 隐藏，避免在动画层出现前闪出一帧白板。
+                // 首次展开没有截图，才直接显示 01.html。
+                bool playShowTransition = hasWhiteboardScreenshot && !string.IsNullOrEmpty(lastWhiteboardScreenshotPath);
+                if (!playShowTransition)
                 {
-                    _isSettingZOrder = true;
-                    try
+                    lock (_zOrderLock)
                     {
-                        // 先展示WebLayer，避免任务栏切换导致延迟显示
-                        if (webLayer != null && !webLayer.IsDisposed)
+                        _isSettingZOrder = true;
+                        try
                         {
-                            webLayer.Bounds = Screen.PrimaryScreen.Bounds;
-                            webLayer.Show();
-                            ForceWebLayerTopMost();
-                            ForceWindowToFront(webLayer.Handle);
-                        }
-
-                        // 再处理任务栏隐藏和工作区调整
-                        HideTaskbar();
-
-                        this.BeginInvoke(new Action(() =>
-                        {
-                            if (webLayer != null && !webLayer.IsDisposed && webLayer.Visible)
+                            if (webLayer != null && !webLayer.IsDisposed)
                             {
-                                ForceWebLayerTopMost();
-                                ForceWindowToFront(webLayer.Handle);
+                                webLayer.Bounds = Screen.PrimaryScreen.Bounds;
+                                webLayer.Show();
+                                DisableTouchFeedback(webLayer.Handle);
+                                if (webView?.Handle != IntPtr.Zero)
+                                {
+                                    DisableTouchFeedback(webView.Handle);
+                                }
                             }
 
                             this.BeginInvoke(new Action(() =>
                             {
+                                if (webLayer != null && !webLayer.IsDisposed && webLayer.Visible)
+                                {
+                                    ForceWebLayerTopMost();
+                                    ForceWindowToFront(webLayer.Handle);
+                                }
                                 _isSettingZOrder = false;
                             }));
-                        }));
-                    }
-                    catch
-                    {
-                        _isSettingZOrder = false;
+                        }
+                        catch
+                        {
+                            _isSettingZOrder = false;
+                        }
                     }
                 }
+
+                btnForm.Hide();
+
+                // 第一次展开还没有白板截图，直接显示 01.html，避免播放没有内容的动画。
+                if (!playShowTransition)
+                {
+                    return;
+                }
+
+                _ = PlayTransitionAsync("show");
             }
             else
             {
-                webLayer?.Hide();
-                // 收起时显示btnForm并恢复展开按钮
-                btnForm.Show();
-                btnToggle.Image = Image.FromFile(imgExpand);
-                SetButtonRegion(btnForm, (Bitmap)btnToggle.Image);
-                ShowTaskbar();
+                // 由 PlayTransitionAsync 在关闭动画完成后显示展开按钮。
+                // 这里不能提前 Show，否则动画层尚未覆盖白板时就会改变窗口层级。
+                _ = PlayTransitionAsync("hide");
             }
         }
 
@@ -947,38 +1195,6 @@ namespace _01
             }
         }
 
-        private void HideTaskbar()
-        {
-            IntPtr taskbar = FindWindow("Shell_TrayWnd", null);
-            IntPtr startButton = FindWindow("Button", null);
-            if (taskbar != IntPtr.Zero) ShowWindow(taskbar, SW_HIDE);
-            if (startButton != IntPtr.Zero) ShowWindow(startButton, SW_HIDE);
-
-            // 同时设置工作区为整个屏幕，避免留下“空白”保留区域
-            var screenBounds = Screen.PrimaryScreen.Bounds;
-            var fullRect = new RECT { left = screenBounds.Left, top = screenBounds.Top, right = screenBounds.Right, bottom = screenBounds.Bottom };
-            SystemParametersInfo(SPI_SETWORKAREA, 0, ref fullRect, SPIF_SENDCHANGE);
-
-            // 兼容性的AppBar通知
-            var abd = new APPBARDATA { cbSize = Marshal.SizeOf(typeof(APPBARDATA)), hWnd = taskbar, rc = fullRect, lParam = ABS_AUTOHIDE };
-            SHAppBarMessage(ABM_SETSTATE, ref abd);
-        }
-
-        private void ShowTaskbar()
-        {
-            IntPtr taskbar = FindWindow("Shell_TrayWnd", null);
-            IntPtr startButton = FindWindow("Button", null);
-            if (taskbar != IntPtr.Zero) ShowWindow(taskbar, SW_SHOW);
-            if (startButton != IntPtr.Zero) ShowWindow(startButton, SW_SHOW);
-
-            // 恢复启动前的工作区
-            var restoreRect = new RECT { left = _originalWorkArea.Left, top = _originalWorkArea.Top, right = _originalWorkArea.Right, bottom = _originalWorkArea.Bottom };
-            SystemParametersInfo(SPI_SETWORKAREA, 0, ref restoreRect, SPIF_SENDCHANGE);
-
-            // 兼容性的AppBar通知
-            var abd = new APPBARDATA { cbSize = Marshal.SizeOf(typeof(APPBARDATA)), hWnd = taskbar, rc = restoreRect, lParam = 0 };
-            SHAppBarMessage(ABM_SETSTATE, ref abd);
-        }
         #endregion
 
         #region PNG转Region 镂空
@@ -1007,20 +1223,8 @@ namespace _01
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-
-        [DllImport("user32.dll")]
-        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-        [DllImport("user32.dll")]
-        private static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
-
         [DllImport("user32.dll")]
         private static extern IntPtr SetActiveWindow(IntPtr hWnd);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr SetFocus(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         private static extern bool BringWindowToTop(IntPtr hWnd);
@@ -1037,11 +1241,9 @@ namespace _01
         [DllImport("user32.dll")]
         private static extern bool GetCursorPos(out POINT lpPoint);
 
+        // 触摸反馈设置API
         [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool SystemParametersInfo(int uiAction, int uiParam, ref RECT pvParam, int fWinIni);
-
-        [DllImport("shell32.dll", SetLastError = true)]
-        private static extern IntPtr SHAppBarMessage(uint dwMessage, ref APPBARDATA pData);
+        private static extern bool SetWindowFeedbackSetting(IntPtr hwnd, FEEDBACK_TYPE feedback, uint dwFlags, uint size, [In] ref bool configuration);
 
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT
@@ -1049,37 +1251,6 @@ namespace _01
             public int X;
             public int Y;
         }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct RECT
-        {
-            public int left;
-            public int top;
-            public int right;
-            public int bottom;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct APPBARDATA
-        {
-            public int cbSize;
-            public IntPtr hWnd;
-            public uint uCallbackMessage;
-            public uint uEdge;
-            public RECT rc;
-            public int lParam;
-        }
-
-        private const int SW_HIDE = 0;
-        private const int SW_SHOW = 5;
-        private const int SW_SHOWNOACTIVATE = 4;
-
-        private const int SPI_SETWORKAREA = 0x002F;
-        private const int SPIF_SENDCHANGE = 0x0002;
-
-        private const uint ABM_GETSTATE = 0x00000004;
-        private const uint ABM_SETSTATE = 0x0000000A;
-        private const int ABS_AUTOHIDE = 0x1;
 
         private const int WS_EX_NOACTIVATE = 0x08000000;
 
