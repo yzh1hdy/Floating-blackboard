@@ -1,11 +1,14 @@
-﻿using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -41,6 +44,7 @@ namespace _01
         private WebView2 animationWebView;
         private Form animationLayer;
         private bool animationReady;
+        private TaskCompletionSource<bool>? animationInitializedSignal;
         private TaskCompletionSource<bool>? screenshotReadySignal;
         private bool transitionInProgress;
         private bool hasWhiteboardScreenshot;
@@ -62,6 +66,20 @@ namespace _01
         private bool _isSettingZOrder = false;
         private DateTime _lastTopMostTime = DateTime.MinValue;
         private readonly object _zOrderLock = new object();
+
+        // 鼠标穿透（透明模式）状态：开启时跳过抢焦点逻辑，避免破坏穿透点击
+        private bool _passthroughActive;
+
+        // 鼠标穿透相关：工具栏豁免区（屏幕坐标）、命中测试常量与子类化回调
+        private const int WM_NCHITTEST = 0x0084;
+        private const int HTTRANSPARENT = -1;
+        private Rectangle _toolbarScreenRect;
+        private Form? _toolbarInputOverlay;
+        private static FloatTimerForm? _passthroughOwner;
+        // 鼠标穿透开启前记录的下层前台窗口，穿透开启后把焦点交还给它
+        private IntPtr _previousForegroundWindow = IntPtr.Zero;
+        private readonly List<IntPtr> _subclassedWindows = new List<IntPtr>();
+        private readonly WndSubclassProc _passthroughSubclassProc = PassthroughSubclassProc;
 
         #region 性能模式相关字段
         // 性能模式状态
@@ -175,6 +193,9 @@ namespace _01
             focusCheckTimer = new System.Windows.Forms.Timer { Interval = 100 };
             focusCheckTimer.Tick += (_, _) =>
             {
+                // 鼠标穿透模式下不抢焦点，保证点击能穿透到下层窗��
+                if (_passthroughActive) return;
+
                 if (webLayer != null && !webLayer.IsDisposed && webLayer.Visible)
                 {
                     IntPtr fgWindow = GetForegroundWindow();
@@ -221,6 +242,26 @@ namespace _01
             // 移除启动完成通知
             // ShowBalloonTip("Interactive Blackboard", "白板启动成功，可在托盘中操作");
 
+            _ = AutoToggleWebViewAsync();
+        }
+
+        private async Task AutoToggleWebViewAsync()//自动开关白板
+        {
+            await Task.Delay(3500);
+
+            if (IsDisposed || expanded)
+            {
+                return;
+            }
+
+            Toggle();
+
+            await Task.Delay(800);
+
+            if (!IsDisposed && expanded)
+            {
+                Toggle();
+            }
         }
 
         #region 配置管理
@@ -379,7 +420,7 @@ namespace _01
                 }
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
-                // 2. 禁用电源节流
+                // 2. ��用电源节流
                 DisablePowerThrottling();
 
                 // 3. 预分配内存
@@ -625,10 +666,10 @@ namespace _01
                 try
                 {
                     SetWindowPos(webLayer.Handle, HWND_TOPMOST, 0, 0, 0, 0,
-                                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
 
                     SetWindowPos(webLayer.Handle, HWND_TOP, 0, 0, 0, 0,
-                                SWP_NOMOVE | SWP_NOSIZE);
+                                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
                 }
                 finally
                 {
@@ -846,6 +887,8 @@ namespace _01
                 {
                     this.Invoke(new Action(() =>
                     {
+                        // 隐藏白板时同步关闭鼠标穿透
+                        SetMousePassthrough(false, Rectangle.Empty);
                         if (expanded)
                         {
                             expanded = false;
@@ -855,9 +898,352 @@ namespace _01
                         }
                     }));
                 }
+                else if (!string.IsNullOrEmpty(message) && message[0] == '{')
+                {
+                    // JSON消息：鼠标穿透等
+                    HandleHostMessage(message);
+                }
             }
             catch { }
         }
+
+        // 处理来自HTML的JSON消息（支持：setMousePassthrough 鼠标穿透；savePhoto/listPhotos/clearAlbum 相册）
+        private void HandleHostMessage(string json)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("type", out var typeProp)) return;
+                string messageType = typeProp.GetString() ?? "";
+                // 相册相关消息交由专门处理，鼠标穿透逻辑保持原样
+                if (messageType != "setMousePassthrough")
+                {
+                    HandleAlbumMessage(messageType, root);
+                    return;
+                }
+                if (messageType != "setMousePassthrough") return;
+
+                bool enabled = root.TryGetProperty("enabled", out var enabledProp) && enabledProp.GetBoolean();
+
+                // 工具栏豁免区（CSS像素 → 物理像素）：JS端同时上报 devicePixelRatio
+                Rectangle toolbarRect = Rectangle.Empty;
+                if (enabled && root.TryGetProperty("toolbar", out var toolbarProp))
+                {
+                    double scale = 1.0;
+                    if (root.TryGetProperty("dpr", out var dprProp)) scale = dprProp.GetDouble();
+                    int x = (int)Math.Round(toolbarProp.GetProperty("x").GetDouble() * scale);
+                    int y = (int)Math.Round(toolbarProp.GetProperty("y").GetDouble() * scale);
+                    int w = (int)Math.Round(toolbarProp.GetProperty("width").GetDouble() * scale);
+                    int h = (int)Math.Round(toolbarProp.GetProperty("height").GetDouble() * scale);
+                    toolbarRect = new Rectangle(x, y, w, h);
+                }
+
+                this.Invoke(new Action(() => SetMousePassthrough(enabled, toolbarRect)));
+            }
+            catch { }
+        }
+
+        // 设置鼠标穿透：开启后拦截 WebView 窗口的命中测试，除工具栏豁免区外全部点击穿透
+        private void SetMousePassthrough(bool enabled, Rectangle toolbarRect)
+        {
+            _passthroughActive = enabled;
+            _passthroughOwner = enabled ? this : null;
+
+            if (enabled && webLayer != null && !webLayer.IsDisposed)
+            {
+                // HTML 上报的是 WebView 视口坐标，转换成屏幕坐标后创建独立的点击接收窗。
+                toolbarRect.Offset(webLayer.Left, webLayer.Top);
+                _toolbarScreenRect = toolbarRect;
+                SetClickThroughStyle(webLayer.Handle, true);
+                CreateToolbarInputOverlay();
+                // 穿透开启后，让白板/WebView 让出焦点，焦点交给下层的程序
+                ReleaseWebLayerFocus();
+            }
+            else
+            {
+                _toolbarScreenRect = Rectangle.Empty;
+                RemoveToolbarInputOverlay();
+                if (webLayer != null && !webLayer.IsDisposed)
+                {
+                    SetClickThroughStyle(webLayer.Handle, false);
+                }
+                _passthroughOwner = null;
+            }
+
+            Debug.WriteLine(enabled
+                ? $"鼠标穿透已开启，工具栏由独立覆盖窗接收: {_toolbarScreenRect}"
+                : "鼠标穿透已关闭");
+        }
+
+        #region 焦点交接（鼠标穿透时把焦点交给下层程序）
+        // 记录被本程序抢走焦点前的下层前台窗口，穿透开启时用其交还焦点
+        private void CapturePreviousForeground()
+        {
+            IntPtr fg = GetForegroundWindow();
+            if (fg == IntPtr.Zero || IsOwnWindow(fg)) return;
+            _previousForegroundWindow = fg;
+        }
+
+        // 鼠标穿透开启时调用：让白板/WebView 让出焦点，焦点交给下层的程序
+        private void ReleaseWebLayerFocus()
+        {
+            if (webLayer == null || webLayer.IsDisposed || !webLayer.Visible) return;
+
+            IntPtr target = IntPtr.Zero;
+            if (_previousForegroundWindow != IntPtr.Zero &&
+                IsWindow(_previousForegroundWindow) &&
+                IsWindowVisible(_previousForegroundWindow))
+            {
+                target = _previousForegroundWindow;
+            }
+
+            if (target == IntPtr.Zero)
+            {
+                target = FindWindowBelowWebLayer();
+            }
+
+            if (target != IntPtr.Zero)
+            {
+                GiveFocusToWindow(target);
+            }
+        }
+
+        // 在 Z 序中查找白板窗口正下方的第一个可见、非本程序窗口
+        private IntPtr FindWindowBelowWebLayer()
+        {
+            if (webLayer == null || webLayer.IsDisposed) return IntPtr.Zero;
+
+            IntPtr h = webLayer.Handle;
+            while (true)
+            {
+                h = GetWindow(h, GW_HWNDNEXT);
+                if (h == IntPtr.Zero) return IntPtr.Zero;
+
+                if (IsOwnWindow(h)) continue;
+                if (!IsWindowVisible(h)) continue;
+
+                return h;
+            }
+        }
+
+        // 只转移焦点，不改变目标窗口的置顶属性
+        private void GiveFocusToWindow(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero || !IsWindow(hWnd) || IsOwnWindow(hWnd)) return;
+
+            IntPtr fg = GetForegroundWindow();
+            uint fgThread = GetWindowThreadProcessId(fg, out _);
+            uint appThread = GetWindowThreadProcessId(hWnd, out _);
+
+            if (fgThread != appThread)
+            {
+                AttachThreadInput(fgThread, appThread, true);
+            }
+
+            try
+            {
+                BringWindowToTop(hWnd);
+                SetForegroundWindow(hWnd);
+                SetActiveWindow(hWnd);
+            }
+            finally
+            {
+                if (fgThread != appThread)
+                {
+                    AttachThreadInput(fgThread, appThread, false);
+                }
+            }
+        }
+
+        // 判断句柄是否属于本程序自己的窗口
+        private bool IsOwnWindow(IntPtr h)
+        {
+            if (h == IntPtr.Zero) return false;
+            if (h == this.Handle) return true;
+            if (btnForm != null && h == btnForm.Handle) return true;
+            if (webLayer != null && h == webLayer.Handle) return true;
+            if (animationLayer != null && h == animationLayer.Handle) return true;
+            if (_toolbarInputOverlay != null && h == _toolbarInputOverlay.Handle) return true;
+            return false;
+        }
+        #endregion
+
+        private void CreateToolbarInputOverlay()
+        {
+            RemoveToolbarInputOverlay();
+            if (_toolbarScreenRect.Width <= 0 || _toolbarScreenRect.Height <= 0) return;
+
+            _toolbarInputOverlay = new Form
+            {
+                FormBorderStyle = FormBorderStyle.None,
+                ShowInTaskbar = false,
+                ShowIcon = false,
+                TopMost = true,
+                StartPosition = FormStartPosition.Manual,
+                Bounds = _toolbarScreenRect,
+                // 不能使用 TransparencyKey：被抠掉的区域会连同鼠标命中一起透明。
+                // 使用极低不透明度保留真实窗口命中，同时视觉上不可见。
+                BackColor = Color.Black,
+                Opacity = 0.01,
+                Text = ""
+            };
+            SetToolWindow(_toolbarInputOverlay.Handle);
+            SetWindowLong(_toolbarInputOverlay.Handle, GWL_EXSTYLE,
+                GetWindowLong(_toolbarInputOverlay.Handle, GWL_EXSTYLE) | 0x08000000);
+
+            _toolbarInputOverlay.MouseDown += (_, e) => ForwardPassthroughPointer("down", e);
+            _toolbarInputOverlay.MouseMove += (_, e) => ForwardPassthroughPointer("move", e);
+            _toolbarInputOverlay.MouseUp += (_, e) => ForwardPassthroughPointer("up", e);
+            // 不设置 owner，避免 owner 的层级/激活状态把覆盖窗压到 WebView 后面。
+            _toolbarInputOverlay.Show();
+            SetWindowPos(_toolbarInputOverlay.Handle, HWND_TOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        }
+
+        private void RemoveToolbarInputOverlay()
+        {
+            if (_toolbarInputOverlay == null) return;
+            var overlay = _toolbarInputOverlay;
+            _toolbarInputOverlay = null;
+            if (!overlay.IsDisposed) overlay.Close();
+            overlay.Dispose();
+        }
+
+        private void ForwardPassthroughPointer(string action, MouseEventArgs e)
+        {
+            if (!_passthroughActive || webView?.CoreWebView2 == null || webLayer == null) return;
+
+            // 【修复】快速点击时 MouseUp 可能在覆盖窗外释放而丢失，
+            // 导致 JS 端永远收不到 up，工具栏点击状态卡死。
+            // 在 down 时捕获鼠标到覆盖窗，确保 up 一定被转发。
+            if (action == "down" && _toolbarInputOverlay != null && !_toolbarInputOverlay.IsDisposed)
+            {
+                _toolbarInputOverlay.Capture = true;
+            }
+            else if (action == "up" && _toolbarInputOverlay != null && !_toolbarInputOverlay.IsDisposed)
+            {
+                _toolbarInputOverlay.Capture = false;
+            }
+
+            Point screenPoint = _toolbarInputOverlay?.PointToScreen(e.Location) ?? Cursor.Position;
+            var payload = new
+            {
+                type = "passthroughPointer",
+                action,
+                button = e.Button.ToString().ToLowerInvariant(),
+                x = screenPoint.X - webLayer.Left,
+                y = screenPoint.Y - webLayer.Top,
+                screenX = screenPoint.X,
+                screenY = screenPoint.Y
+            };
+            webView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(payload));
+        }
+
+        #region 鼠标穿透（透明模式）- WebView 窗口子类化
+        private delegate IntPtr WndSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData);
+
+        private static readonly UIntPtr PassthroughSubclassId = (UIntPtr)0xA110;
+
+        private static IntPtr PassthroughSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData)
+        {
+            var owner = _passthroughOwner;
+            if (owner != null && owner._passthroughActive && uMsg == WM_NCHITTEST)
+            {
+                // lParam 低位字 = 屏幕X，高位字 = 屏幕Y
+                int x = (short)(lParam.ToInt64() & 0xFFFF);
+                int y = (short)((lParam.ToInt64() >> 16) & 0xFFFF);
+                if (!owner._toolbarScreenRect.Contains(x, y))
+                {
+                    return new IntPtr(HTTRANSPARENT);
+                }
+
+                // 工具栏区域必须继续走 WebView 的正常命中测试，不能返回 HTTRANSPARENT。
+                return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+            }
+            return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+        }
+
+        // 设置窗口扩展样式。WebView2 会创建多个原生子窗口，必须全部设置，
+        // 否则顶层窗口虽然透明，实际输入仍会被子窗口截获。
+        private static void SetClickThroughStyle(IntPtr root, bool enabled)
+        {
+            if (root == IntPtr.Zero) return;
+
+            var queue = new Queue<IntPtr>();
+            queue.Enqueue(root);
+            while (queue.Count > 0)
+            {
+                IntPtr hWnd = queue.Dequeue();
+                int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+                // 不给 WebView 子窗口设置 WS_EX_TRANSPARENT：该样式会无条件跳过整个窗口，
+                // 即使 WM_NCHITTEST 返回正常命中，也会导致工具栏无法点击。
+                // 由子类化后的 WM_NCHITTEST 在工具栏外返回 HTTRANSPARENT，实现按区域穿透。
+                // 仅依靠 WM_NCHITTEST 做按区域穿透。
+                // 不能给 WebView 或其子窗口设置 WS_EX_NOACTIVATE：
+                // WebView2 会把该样式传播到实际承载页面的窗口，导致命中测试
+                // 在进入我们的回调前就被系统跳过，最终表现为整个窗口都无法穿透。
+                int newStyle = exStyle;
+                if (enabled)
+                {
+                    // 主 WebView 及其子窗口全部穿透；工具栏点击由独立覆盖窗接收。
+                    newStyle |= WS_EX_TRANSPARENT;
+                }
+                else
+                {
+                    newStyle &= ~WS_EX_TRANSPARENT;
+                    newStyle &= ~0x08000000;
+                }
+
+                if (newStyle != exStyle)
+                {
+                    SetWindowLong(hWnd, GWL_EXSTYLE, newStyle);
+                    SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                }
+
+                IntPtr child = GetWindow(hWnd, GW_CHILD);
+                while (child != IntPtr.Zero)
+                {
+                    queue.Enqueue(child);
+                    child = GetWindow(child, GW_HWNDNEXT);
+                }
+            }
+        }
+
+        // 对 webView 窗口及其全部子窗口统一子类化，确保命中测试被拦截
+        private void SubclassWindowTree(IntPtr root)
+        {
+            RemoveSubclass();
+            if (root == IntPtr.Zero) return;
+
+            var queue = new Queue<IntPtr>();
+            queue.Enqueue(root);
+            while (queue.Count > 0)
+            {
+                IntPtr h = queue.Dequeue();
+                if (SetWindowSubclass(h, _passthroughSubclassProc, PassthroughSubclassId, UIntPtr.Zero))
+                {
+                    _subclassedWindows.Add(h);
+                }
+                IntPtr child = GetWindow(h, GW_CHILD);
+                while (child != IntPtr.Zero)
+                {
+                    queue.Enqueue(child);
+                    child = GetWindow(child, GW_HWNDNEXT);
+                }
+            }
+        }
+
+        private void RemoveSubclass()
+        {
+            foreach (var h in _subclassedWindows)
+            {
+                RemoveWindowSubclass(h, _passthroughSubclassProc, PassthroughSubclassId);
+            }
+            _subclassedWindows.Clear();
+        }
+        #endregion
 
         private string ResolveHtmlPath(string fileName)
         {
@@ -892,6 +1278,7 @@ namespace _01
             };
             animationLayer.Controls.Add(animationWebView);
             animationReady = false;
+            animationInitializedSignal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             await animationWebView.EnsureCoreWebView2Async(_webViewEnvironment);
             animationWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
@@ -904,6 +1291,14 @@ namespace _01
 
             for (int i = 0; i < 100 && !animationReady; i++)
                 await Task.Delay(50);
+
+            // NavigationCompleted 只代表文档导航完成，不代表首帧已经绘制。
+            // 等待 1.html 在 DOM/CSS 初始化并完成至少两帧合成后再允许切换窗口。
+            if (animationReady && animationInitializedSignal != null)
+            {
+                await Task.WhenAny(animationInitializedSignal.Task, Task.Delay(600));
+                animationInitializedSignal = null;
+            }
         }
 
         private async Task<string?> CaptureWhiteboardAsync()
@@ -960,7 +1355,10 @@ namespace _01
         {
             try
             {
-                if (e.TryGetWebMessageAsString() == "screenshotReady")
+                string message = e.TryGetWebMessageAsString();
+                if (message == "animationReady")
+                    animationInitializedSignal?.TrySetResult(true);
+                else if (message == "screenshotReady")
                     screenshotReadySignal?.TrySetResult(true);
             }
             catch { }
@@ -976,7 +1374,7 @@ namespace _01
                 if (animationWebView?.CoreWebView2 == null || !animationReady) return;
 
                 // 只在关闭白板时截取一次，并缓存这张截图。
-                // 后续展开直接复用上次关闭时的画面，不再先显示 01.html 进行截图。
+                // 后续展开直接复用上次关闭时的画面，不再先显�� 01.html 进行截图。
                 if (direction == "hide")
                 {
                     var screenshot = await CaptureWhiteboardAsync();
@@ -1008,6 +1406,11 @@ namespace _01
                 animationLayer.BringToFront();
                 SetWindowPos(animationLayer.Handle, HWND_TOPMOST, 0, 0, 0, 0,
                     SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+
+                // Show/SetWindowPos 是异步提交给桌面合成器的；低性能设备上如果立即
+                // 隐藏 01.html，可能出现一个合成空帧而透出桌面。留出至少两帧让动画 WebView
+                // 真正进入可见合成状态，再切换窗口归属。
+                await Task.Delay(50);
 
                 // 动画开始前切换窗口可见性：
                 // 打开时必须先隐藏白板，避免 01.html 盖住 1.html；
@@ -1049,6 +1452,8 @@ namespace _01
 
         private void DisposeWebLayer()
         {
+            // 移除鼠标穿透子类化
+            RemoveSubclass();
             ClearWhiteboardScreenshot();
 
             if (webView != null)
@@ -1081,6 +1486,148 @@ namespace _01
         }
         #endregion
 
+        #region 相册（拍照保存 / 列表读取 / 清空）
+        // 相册目录：程序（HTML）同目录下的 album 文件夹
+        private readonly object _albumLock = new object();
+        private string AlbumDirectory => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "album");
+
+        // 相册消息分发：savePhoto 保存照片；listPhotos 返回照片列表；clearAlbum 清空相册
+        private void HandleAlbumMessage(string type, JsonElement root)
+        {
+            try
+            {
+                if (type == "savePhoto")
+                {
+                    string dataUrl = root.TryGetProperty("data", out var dataProp)
+                        ? (dataProp.GetString() ?? "") : "";
+                    if (!string.IsNullOrEmpty(dataUrl)) SavePhoto(dataUrl);
+                }
+                else if (type == "listPhotos")
+                {
+                    SendPhotoList();
+                }
+                else if (type == "clearAlbum")
+                {
+                    ClearAlbum();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"相册消息处理失败: {ex.Message}");
+            }
+        }
+
+        // 保存照片：dataURL(base64 JPEG，方向已由 HTML 按当前视频旋转烤入) 写入 album 文件夹
+        private void SavePhoto(string dataUrl)
+        {
+            try
+            {
+                int comma = dataUrl.IndexOf(',');
+                string base64 = comma >= 0 ? dataUrl.Substring(comma + 1) : dataUrl;
+                byte[] bytes = Convert.FromBase64String(base64);
+
+                lock (_albumLock)
+                {
+                    Directory.CreateDirectory(AlbumDirectory);
+                    // 实际文件名（Windows 不允许 / 和 :）：yyyy-MM-dd_HH-mm-ss_fff.jpg
+                    string baseName = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss_fff");
+                    string path = Path.Combine(AlbumDirectory, baseName + ".jpg");
+                    int n = 1;
+                    while (File.Exists(path))
+                    {
+                        path = Path.Combine(AlbumDirectory, baseName + "_" + (n++) + ".jpg");
+                    }
+                    File.WriteAllBytes(path, bytes);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"保存照片失败: {ex.Message}");
+            }
+            // 保存后回传最新列表（相册面板打开时自动刷新）
+            SendPhotoList();
+        }
+
+        // 读取相册并把照片列表（时间升序，最新在最后）回传 HTML
+        private void SendPhotoList()
+        {
+            var photos = new List<object>();
+            try
+            {
+                if (Directory.Exists(AlbumDirectory))
+                {
+                    var allowedExt = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    { ".jpg", ".jpeg", ".png" };
+                    var paths = Directory.GetFiles(AlbumDirectory)
+                        .Where(p => allowedExt.Contains(Path.GetExtension(p)))
+                        .OrderBy(p => Path.GetFileName(p), StringComparer.Ordinal)
+                        .ToList();
+                    foreach (var p in paths)
+                    {
+                        string fileName = Path.GetFileName(p);
+                        string rawName = Path.GetFileNameWithoutExtension(p);
+                        string label = FormatPhotoLabel(rawName);
+                        string url;
+                        try { url = new Uri(p).AbsoluteUri; }
+                        catch { url = fileName; }
+                        photos.Add(new { name = fileName, label = label, url = url });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"读取相册失败: {ex.Message}");
+            }
+
+            string json = JsonSerializer.Serialize(new { type = "photoList", photos = photos });
+            try
+            {
+                webView?.CoreWebView2?.PostWebMessageAsJson(json);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"回传相册列表失败: {ex.Message}");
+            }
+        }
+
+        // 文件名 → 列表显示标签：yyyy/MM/dd-HH:mm:ss（解析失败则原样返回）
+        private static string FormatPhotoLabel(string rawName)
+        {
+            // 去掉同秒重名时追加的 "_1" 等后缀
+            string name = System.Text.RegularExpressions.Regex.Replace(rawName, @"_\d+$", "");
+            if (DateTime.TryParseExact(name, "yyyy-MM-dd_HH-mm-ss_fff",
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+            {
+                return dt.ToString("yyyy/MM/dd-HH:mm:ss", CultureInfo.InvariantCulture);
+            }
+            return rawName;
+        }
+
+        // 清空相册：删除 album 文件夹内全部照片文件
+        private void ClearAlbum()
+        {
+            try
+            {
+                lock (_albumLock)
+                {
+                    if (Directory.Exists(AlbumDirectory))
+                    {
+                        foreach (var file in Directory.GetFiles(AlbumDirectory))
+                        {
+                            try { File.Delete(file); } catch { }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"清空相册失败: {ex.Message}");
+            }
+            // 清空后回传空列表（HTML 会自动返回相机）
+            SendPhotoList();
+        }
+        #endregion
+
         private void OnCoreReady(object? sender, CoreWebView2InitializationCompletedEventArgs e)
         {
             if (!e.IsSuccess) return;
@@ -1101,6 +1648,12 @@ namespace _01
             s.IsPasswordAutosaveEnabled = false;
 
             webView.CoreWebView2.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Dark;
+
+            // 自动允许摄像头/麦克风等设备权限，无需用户确认
+            webView.CoreWebView2.PermissionRequested += (s, args) =>
+            {
+                args.State = CoreWebView2PermissionState.Allow;
+            };
 
             string htmlPath = ResolveHtmlPath("01.html");
             webView.CoreWebView2.Navigate(htmlPath);
@@ -1173,6 +1726,9 @@ namespace _01
         #region 窗口激活与置顶优化
         private void ForceWindowToFront(IntPtr hWnd)
         {
+            // 抢焦点前记录下层前台窗口，鼠标穿透开启时用其交还焦点
+            CapturePreviousForeground();
+
             IntPtr fgWindow = GetForegroundWindow();
             uint fgThread = GetWindowThreadProcessId(fgWindow, out _);
             uint appThread = GetWindowThreadProcessId(hWnd, out _);
@@ -1196,6 +1752,7 @@ namespace _01
         }
 
         #endregion
+
 
         #region PNG转Region 镂空
         private static void SetButtonRegion(Form form, Bitmap bmp)
@@ -1236,10 +1793,30 @@ namespace _01
         private static extern IntPtr GetForegroundWindow();
 
         [DllImport("user32.dll")]
+        private static extern bool IsWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
         private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
 
         [DllImport("user32.dll")]
         private static extern bool GetCursorPos(out POINT lpPoint);
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
+
+        [DllImport("comctl32.dll", SetLastError = true)]
+        private static extern bool SetWindowSubclass(IntPtr hWnd, WndSubclassProc pfnSubclass, UIntPtr uIdSubclass, UIntPtr dwRefData);
+
+        [DllImport("comctl32.dll")]
+        private static extern IntPtr DefSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("comctl32.dll")]
+        private static extern bool RemoveWindowSubclass(IntPtr hWnd, WndSubclassProc pfnSubclass, UIntPtr uIdSubclass);
+
+        private const uint GW_CHILD = 5;
+        private const uint GW_HWNDNEXT = 2;
 
         // 触摸反馈设置API
         [DllImport("user32.dll", SetLastError = true)]
@@ -1308,3 +1885,4 @@ namespace _01
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData) => true;
     }
 }
+//（注：内容由AI生成）

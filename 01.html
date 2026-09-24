@@ -5,64 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Interactive Blackboard</title>
     <script src="tailwind.js"></script>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="01styles.css">
     <base target="_blank">
 <base target="_blank">
 </head>
 <body class="text-gray-200 select-none">
-
-
-    <!-- 视频背景元素 - 最底层 (z-index: 1) -->
-    <video id="video-background" autoplay playsinline muted></video>
-
-    <!-- Canvas Container - 中间层 (z-index: 10) -->
-    <div id="canvas-container" class="cursor-pen w-full h-full fixed inset-0"></div>
-
-    <!-- 超大橡皮擦预览层 - z-index: 20 -->
+    <div id="video-bg-wrap"><video id="video-background" autoplay playsinline muted></video>
+        <img id="album-photo-view" alt="" draggable="false">
+    </div>
+    <div id="canvas-container" class="cursor-pen w-full h-full fixed inset-0">
+        <img id="watermark" src="水印.png" alt="" draggable="false">
+    </div>
     <canvas id="mega-eraser-preview"></canvas>
-
-    <!-- Grid Canvas - 在画布之上但在UI之下 -->
     <canvas id="grid-canvas"></canvas>
-
-    <!-- 左下角隐藏按钮（合并自原C#中的btnHide） -->
     <button id="btn-hide" onclick="hideWebLayer()"
             style="position: fixed; bottom: 42px; left: -20px; z-index: 1000; width: 80px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 30px; background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); border: 2px solid rgba(255,255,255,0.25); color: rgba(255,255,255,0.9); cursor: pointer;">
            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="15 18 9 12 15 6"></polyline>
         </svg>隐藏
     </button>
-
-    <!-- Bottom Right: Clean Page Navigation -->
-    <div class="fixed bottom-3 right-3 z-50 flex items-center gap-1">
+    <div class="fixed bottom-3 right-3 z-50 flex items-center gap-1" id="pageNav">
         <button id="prevPageBtn" class="nav-btn" ontouchstart="handlePrevPageTouch(event)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M15 18l-6-6 6-6" />
             </svg>
         </button>
-
         <div class="text-sm text-white/50 w-12 text-center select-none" id="pageIndicator">1/1</div>
-
         <button id="nextPageBtn" class="nav-btn" ontouchstart="handleNextPageTouch(event)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M9 18l6-6-6-6" />
             </svg>
         </button>
     </div>
-
-    <!-- Bottom Center: Toolbar -->
-    <div class="toolbar">
+    <div class="toolbar" id="toolbar">
+        <div class="tool-highlight" id="toolHighlight" aria-hidden="true"></div>
+        <!-- 【新增鼠标按钮 最前面】 -->
+        <div style="position: relative;">
+            <button id="tool-mouse" class="tool-btn" onclick="handleMouseClick()" ontouchstart="handleMouseTouch(event)">
+                <img id="img-mouse" src="icon/鼠标.png" alt="鼠标">
+            </button>
+        </div>
         <div style="position: relative;">
             <button id="tool-pen" class="tool-btn" onclick="handlePenClick()" ontouchstart="handlePenTouch(event)">
-                <img id="img-pen" src="icon/笔-松开.png" alt="笔">
+                <img id="img-pen" src="icon/笔.png" alt="笔">
             </button>
             <div id="penMenu" class="pen-menu">
                 <div class="pen-menu-header">画笔设置</div>
-
                 <div class="color-section">
                     <span class="section-label">颜色</span>
                     <div class="color-palette" id="colorPalette"></div>
                 </div>
-
                 <div class="size-section">
                     <span class="section-label">粗细</span>
                     <div class="size-presets">
@@ -80,7 +72,6 @@
                         </button>
                     </div>
                 </div>
-
                 <!-- 自动校正开关 -->
                 <div class="grid-section">
                     <div class="grid-toggle" onclick="toggleAutoCorrection()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
@@ -88,13 +79,11 @@
                         <div class="grid-toggle-switch" id="autoCorrectionSwitch"></div>
                     </div>
                 </div>
-
             </div>
         </div>
-
         <div style="position: relative;">
             <button id="tool-eraser" class="tool-btn" onclick="handleEraserClick()" ontouchstart="handleEraserTouch(event)">
-                <img id="img-eraser" src="icon/橡皮-松开.png" alt="橡皮">
+                <img id="img-eraser" src="icon/橡皮.png" alt="橡皮">
             </button>
             <!-- 橡皮擦设置菜单：选中橡皮后再次点击显示 -->
             <div id="eraserMenu" class="eraser-menu" onclick="event.stopPropagation()">
@@ -106,18 +95,13 @@
                 </div>
             </div>
         </div>
-
         <button id="btn-undo" class="tool-btn" onclick="undo()" ontouchstart="handleUndoTouch(event)">
-            <img id="img-undo" src="icon/撤回-松开.png" alt="撤回">
+            <img id="img-undo" src="icon/撤回.png" alt="撤回">
         </button>
-
-        <button id="btn-clear" class="tool-btn" onclick="confirmClear()" ontouchstart="handleClearTouch(event)">
-            <img id="img-clear" src="icon/清除-松开.png" alt="清除">
-        </button>
-
+        <!-- 【已删除原来的清除按钮 btn‑clear】 -->
         <div style="position: relative;">
             <button id="btn-more" class="tool-btn" onclick="handleMoreClick(event)" ontouchstart="handleMoreTouch(event)">
-                <img id="img-more" src="icon/更多-松开.png" alt="更多">
+                <img id="img-more" src="icon/更多.png" alt="更多">
             </button>
             <div id="moreMenu" class="more-menu" onclick="event.stopPropagation()">
                 <div class="more-menu-header">更多功能</div>
@@ -134,11 +118,12 @@
                         </svg>
                         <span>直线</span>
                     </button>
-                    <button class="more-menu-btn" onclick="startShapeDraw('dashed')" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3">
-                            <line x1="5" y1="19" x2="19" y2="5" />
+                    <button class="more-menu-btn" onclick="openTimer()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="9" />
+                            <path d="M12 7v5l3 2" />
                         </svg>
-                        <span>虚线</span>
+                        <span>计时器</span>
                     </button>
                     <button class="more-menu-btn" onclick="toggleTransparentMode()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -177,15 +162,52 @@
                     <div class="video-toggle-switch" id="videoToggleSwitch"></div>
                 </div>
                 <div class="video-status" id="videoStatus">摄像头已关闭</div>
+                <div class="camera-selector" id="cameraSelector" style="display:none;">
+                    <div class="camera-selector-label">选择摄像头</div>
+                    <select id="cameraSelect" class="camera-select" onchange="onCameraChanged(this.value)"></select>
+                </div>
+                <div class="video-rotate-row">
+                    <button id="videoRotateBtn" class="video-rotate-btn" onclick="rotateVideoCW()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                            <path d="M21 3v5h-5"></path>
+                        </svg>
+                        <span>旋转视频</span>
+                    </button>
+                </div>
             </div>
         </div>
-
         <button id="btn-lottery" class="tool-btn" onclick="showLottery()" ontouchstart="handleLotteryTouch(event)">
-            <img id="img-lottery" src="icon/抽学号-松开.png" alt="抽学号">
+            <img id="img-lottery" src="icon/抽学号.png" alt="抽学号">
         </button>
     </div>
-
-    <!-- 清空页面确认弹窗 -->
+    <div id="cameraToolbar">
+        <button id="btn-capture" class="tool-btn" onclick="capturePhoto()">
+            <img src="icon/拍照.png" alt="拍照">
+        </button>
+        <button id="btn-album" class="tool-btn" onclick="toggleAlbumPanel()">
+            <img src="icon/相册.png" alt="相册">
+        </button>
+    </div>
+    <div id="captureFlash"></div>
+    <div id="albumPanel">
+        <div class="album-panel-header">相册(本地存储)</div>
+        <div class="album-list" id="albumList"></div>
+        <div class="album-bottom">
+            <button class="album-bottom-btn" onclick="clearAlbum()">清空相册</button>
+            <button class="album-bottom-btn" onclick="returnToCamera()">返回相机</button>
+        </div>
+    </div>
+    <div id="timerOverlay" class="timer-overlay" style="display:none;">
+        <iframe id="timerFrame" src="timer.html" title="计时器" allow="autoplay"></iframe>
+        <button id="timerCloseBtn" class="timer-close-btn" onclick="closeTimer()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            |  关闭Timer
+        </button>
+    </div>
     <div class="overlay" id="clearConfirmOverlay" onclick="handleClearOverlayClick(event)">
         <div class="popup" id="clearConfirmPopup">
             <img src="popupwin.png" class="popup-bg" alt="popup background">
@@ -197,8 +219,6 @@
             <button class="btn-ok" onclick="executeClear()"></button>
         </div>
     </div>
-
-    <!-- 加页提示弹窗 -->
     <div class="overlay" id="perfWarningOverlay" onclick="handlePerfOverlayClick(event)">
         <div class="popup" id="perfWarningPopup">
             <img src="popupwin.png" class="popup-bg" alt="popup background">
@@ -210,7 +230,6 @@
             <button class="btn-ok" onclick="confirmAddPage()"></button>
         </div>
     </div>
-
     <div id="resetAllConfirmBar" class="confirm-bar">
         <div class="confirm-modal">
             <div class="confirm-modal-top-bar"></div>
@@ -223,8 +242,6 @@
             </div>
         </div>
     </div>
-
-
     <div class="number-result" id="numberResult">
         <div class="result-close-layer" id="resultCloseLayer"></div>
         <video id="lotterySpecialVideo" preload="auto" style="display:none;position:absolute;inset:0;z-index:4;max-width:100vw;max-height:100vh;margin:auto;" playsinline></video>
@@ -234,8 +251,6 @@
         </div>
         <img id="resultImage" class="result-image" src="" alt="抽奖结果">
     </div>
-
-
     <!-- 关于对话框 - 新样式 -->
     <div id="aboutDialog" class="about-dialog" onclick="closeAboutOnOverlay(event)">
         <div class="confirm-modal">
@@ -243,7 +258,7 @@
             <div class="confirm-modal-content">
                 <img src="icon/ba.png" alt="Logo" class="about-image">
                 <div class="confirm-bar-text">
-                    <a href="https://bluearchive-cn.com/" target="_blank">欢 迎 来 到   基 沃 托 斯  !</a>   W  E  L  C  O  M  E   T  O   K  I  V  O  T  O  S<br>Interactive Blackboard 26w28a _ 此项目已在GitHub上开源：<a href="https://github.com/yzh1hdy/Floating-blackboard" target="_blank">https://github.com/yzh1hdy/Floating-blackboard</a>
+                    <a href="https://i-blackboard.netlify.app/" target="_blank">网页版白板工具：https://i-blackboard.netlify.app/</a> 服务器流量有限 省着点谢谢 <br>Interactive Blackboard v3.4.0 _ 此项目已在GitHub上开源：<a href="https://github.com/yzh1hdy/Floating-blackboard" target="_blank">https://github.com/yzh1hdy/Floating-blackboard</a>
                 </div>
                 <div class="confirm-bar-buttons">
                     <button onclick="closeAbout()" class="confirm-btn confirm-btn-cancel">确定</button>
@@ -252,62 +267,22 @@
             </div>
         </div>
     </div>
-
-    <!-- 关于视频弹窗 -->
     <div id="aboutVideoOverlay" class="video-overlay" onclick="closeAboutVideo(event)">
         <div class="video-modal" onclick="event.stopPropagation()">
             <button id="aboutVideoCloseBtn" class="video-close-btn" onclick="closeAboutVideo(event)">×</button>
             <video id="aboutVideo" src="ba.mp4" controls preload="metadata"></video>
         </div>
     </div>
-
-    <script src="app-data.js"></script>
-    <script src="app-draw.js"></script>
-    <script src="app-core.js"></script>
-
-    <!-- 隐藏功能脚本 -->
-    <script>
-        // 隐藏白板功能：通过WebView2的postMessage通知C#层
-        function hideWebLayer() {
-            if (window.chrome && window.chrome.webview) {
-                window.chrome.webview.postMessage("hideWebLayer");
-            } else {
-                console.log("Hide command sent (webview not available)");
-            }
-        }
-
-        // 键盘快捷键支持：按ESC键也可以隐藏，同时支持关闭新版弹窗
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                var clearOverlay = document.getElementById('clearConfirmOverlay');
-                var perfOverlay = document.getElementById('perfWarningOverlay');
-                if (clearOverlay && clearOverlay.classList.contains('active')) {
-                    closeClearModal();
-                } else if (perfOverlay && perfOverlay.classList.contains('active')) {
-                    closePerfModal();
-                } else {
-                    hideWebLayer();
-                }
-            }
-        });
-
-        // 添加按钮悬停效果
-        (function() {
-            var btn = document.getElementById('btn-hide');
-            if (btn) {
-                btn.addEventListener('mouseenter', function() {
-                    this.style.background = 'rgba(255,255,255,0.25)';
-                    this.style.color = '#fff';
-                });
-                btn.addEventListener('mouseleave', function() {
-                    this.style.background = 'rgba(255,255,255,0.15)';
-                    this.style.color = 'rgba(255,255,255,0.9)';
-                });
-            }
-        })();
-    </script>
-
-    <div class="fixed bottom-3 left-4 text-white/50 text-sm z-50">   测试版 v3.0.0</div>
-
+    <script src="01app-data.js"></script>
+    <script src="01app-canvas.js"></script>
+    <script src="01app-shapes.js"></script>
+    <script src="01app-pages.js"></script>
+    <script src="01app-menus.js"></script>
+    <script src="01app-toolbar.js"></script>
+    <script src="01app-album.js"></script>
+    <script src="01app-lottery.js"></script>
+    <script src="01app-init.js"></script>
+    <script src="01app-hide.js"></script>
 </body>
 </html>
+
