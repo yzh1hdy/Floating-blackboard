@@ -1,0 +1,1790 @@
+* {
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+body {
+    background-color: #0f261e;
+    overflow: hidden;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* 顶部二进制显示栏（仅在抽奖结果界面显示） */
+.top-bar {
+    position: relative;
+    z-index: 3;
+    width: 300px;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 40px;
+    margin-bottom: 16px;
+    flex-shrink: 0;
+}
+
+.top-bar-bg {
+    width: 300px;
+    height: auto;
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+.top-bar-text {
+    position: relative;
+    z-index: 2;
+    color: #ffffff;
+    font-size: 22px;
+    font-family: '小米兰亭 Pro Normal', '小米兰亭pro正常版', 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9);
+    padding: 12px 0;
+    pointer-events: none;
+    user-select: none;
+}
+
+
+
+/* 透明背景模式 */
+body.transparent-mode {
+    background-color: transparent !important;
+}
+
+body.transparent-mode #canvas-container {
+    background-color: transparent !important;
+}
+
+/* 透明模式下所有弹出菜单的背景调整为半透明 */
+body.transparent-mode .pen-menu,
+body.transparent-mode .more-menu,
+body.transparent-mode .video-menu,
+body.transparent-mode .eraser-menu {
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.56), inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -1px 1px rgba(255,255,255,0.06);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+}
+
+/* 透明模式下导航按钮完全透明背景（工具栏保持液态玻璃样式） */
+body.transparent-mode .fixed.bottom-3 {
+    background: transparent !important;
+    backdrop-filter: none;
+}
+
+/* 透明模式下按钮悬停效果 */
+body.transparent-mode .nav-btn:hover:not(:disabled) {
+    background: rgba(255,255,255,0.08);
+}
+
+.cursor-pen { cursor: crosshair; }
+
+.cursor-eraser-active {
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.8)" stroke-width="1.5" style="shape-rendering: geometricPrecision;"/></svg>') 20 20, auto;
+}
+/* 超大橡皮擦模式样式 - 粉色半透明 */
+.mega-eraser-active {
+    cursor: none !important;
+}
+
+/* 超大橡皮擦预览层 */
+#mega-eraser-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 20;
+    display: none;
+}
+
+#mega-eraser-preview.active {
+    display: block;
+}
+
+
+.nav-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.6);
+    border-radius: 10px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    cursor: pointer;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+.nav-btn:disabled { 
+    opacity: 0.15; 
+    cursor: default;
+    border-color: rgba(255,255,255,0.1);
+}
+.nav-btn:hover:not(:disabled) {
+    background: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.9);
+    border-color: rgba(255,255,255,0.3);
+}
+
+/* ========== 液态玻璃工具栏（参考液态玻璃工具栏.html样式） ========== */
+.toolbar {
+    position: fixed;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2147483647 !important;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    border-radius: 34px;
+    /* 触屏关键：禁用浏览器手势（滚动/缩放），把触摸完全交给指针事件 */
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* 液态玻璃背景/模糊移到 ::before：工具栏本体不再携带 backdrop-filter 与 isolation，
+   从而不会成为 backdrop root，子菜单（.pen-menu 等）的 backdrop-filter 才能采样到页面，
+   与工具栏保持一致模糊效果。 */
+.toolbar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.56), inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -1px 1px rgba(255,255,255,0.06);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* 高亮滑块：液态玻璃的活动项指示器，位置由 JS rAF 动画驱动（参考液态玻璃工具栏.html） */
+.tool-highlight {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    width: 72px;
+    height: 50px;
+    border-radius: 34px;
+    background: linear-gradient(145deg, rgba(255,255,255,0.28), rgba(255,255,255,0.1));
+    box-shadow: inset 0 1px rgba(255,255,255,0.32), 0 4px 15px rgba(0,0,0,0.16);
+    opacity: 0;
+    pointer-events: none;
+    /* 位置/形变逐帧由 rAF 更新，禁用 CSS transition 避免两者打架 */
+    transition: none;
+    will-change: left, top, width, height, transform;
+}
+
+.tool-btn {
+    position: relative;
+    z-index: 1;
+    /* 宽一点的圆角矩形（不再是纯圆） */
+    width: 72px;
+    height: 50px;
+    border: none;
+    border-radius: 16px;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* 移除按下缩小效果 */
+    transition: background 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* 移除 tool-btn 的 active 缩小效果 */
+.tool-btn:active {
+    transform: none;
+}
+
+/* 鼠标悬停不再显示半透明背景框、图片不再提亮/切换 */
+.tool-btn:hover {
+    background: transparent;
+}
+
+.tool-btn:focus-visible {
+    outline: 2px solid rgba(255,255,255,0.4);
+    outline-offset: -2px;
+}
+
+.tool-btn img {
+    width: 25px;/*图标大小*/
+    height: 25px;
+    pointer-events: none;
+    user-select: none;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35));
+}
+
+/* 已移除选中工具的图片提亮（图片高亮全部去除），选中状态仅由滑块指示 */
+.tool-btn.tool-active img {}
+
+/* 窄屏适配：按钮与滑块等比缩小，保证工具栏不溢出 */
+@media (max-width: 560px) {
+    .toolbar {
+        gap: 4px;
+        padding: 6px;
+    }
+    .tool-btn {
+        width: 56px;
+        height: 44px;
+        border-radius: 13px;
+    }
+    .tool-highlight {
+        width: 56px;
+        height: 44px;
+        border-radius: 34px;
+    }
+    .tool-btn img {
+        width: 26px;
+        height: 26px;
+    }
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    touch-action: none;
+}
+
+@keyframes popIn {
+    0% { transform: scale(0.9); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+.modal-content { animation: popIn 0.1s ease-out; }
+
+/* 修改后的抽奖结果界面样式 */
+.number-result {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    z-index: 101;
+    justify-content: flex-start;
+    align-items: center;
+    flex-direction: column;
+    padding: 0;
+    margin: 0;
+}
+
+/* 透明模式下抽奖结果背景也调整为半透明 */
+body.transparent-mode .number-result {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 抽奖结果图片：宽度占满屏幕，保持比例 */
+.result-image {
+    width: auto;
+    height: auto;
+    max-width: 100vw;
+    max-height: 70vh;
+    object-fit: contain;
+    position: relative;
+    z-index: 2;
+    user-select: none;
+    pointer-events: none;
+    flex-shrink: 0;
+    margin-top: 15%;
+    margin-bottom: auto;
+}
+
+.result-close-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    cursor: pointer;
+}
+
+.pen-menu {
+    display: none;
+    position: absolute;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%) translateY(34px);
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.56), inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -1px 1px rgba(255,255,255,0.06);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 34px;
+    padding: 20px;
+    z-index: 1 !important;
+    min-width: 220px;
+    opacity: 0;
+    pointer-events: none;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.pen-menu.show {
+    display: block;
+    pointer-events: auto;
+    animation: menuFloatIn 0.42s cubic-bezier(.2,.8,.2,1) forwards;
+}
+
+.pen-menu.fade-out {
+    display: block;
+    pointer-events: none;
+    animation: menuFloatOut 0.28s ease-in forwards;
+}
+
+@keyframes menuFloatIn {
+    from { transform: translateX(-50%) translateY(34px); opacity: 0; }
+    to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+@keyframes menuFloatOut {
+    from { transform: translateX(-50%) translateY(0); opacity: 1; }
+    to { transform: translateX(-50%) translateY(34px); opacity: 0; }
+}
+
+.pen-menu-header {
+    color: #fff;
+    font-size: 16px;
+    margin-bottom: 16px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    padding-bottom: 12px;
+    font-weight: 500;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.pen-menu-close {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    color: rgba(0,0,0,0.6);
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.pen-menu-close:hover {
+    color: rgba(0,0,0,0.95);
+    background: rgba(0,0,0,0.1);
+}
+
+.color-section {
+    margin-bottom: 16px;
+}
+
+.section-label {
+    color: #fff;
+    font-size: 12px;
+    margin-bottom: 10px;
+    display: block;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.color-palette {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.color-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+
+
+.color-btn.active {
+    border-color: #ffc0cb;
+    box-shadow: 0 0 0 2px rgba(255, 192, 203, 0.5);
+}
+
+.color-btn.active::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffc0cb;
+    font-size: 16px;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+}
+
+.size-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.size-presets {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.size-preset-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.1);
+    border: 2px solid transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+
+
+.size-preset-btn.active {
+    background: rgba(255, 192, 203, 0.3);
+    border-color: #ffc0cb;
+    box-shadow: 0 0 0 2px rgba(255, 192, 203, 0.4);
+}
+
+.size-preset-dot {
+    background: #fff;
+    border-radius: 50%;
+}
+
+/* 网格线开关样式 */
+.grid-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.grid-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.grid-toggle:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.grid-toggle-label {
+    color: #fff;
+    font-size: 13px;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.grid-toggle-switch {
+    width: 44px;
+    height: 24px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 12px;
+    position: relative;
+    transition: all 0.3s;
+}
+
+.grid-toggle-switch.active {
+    background: #ffc0cb;
+}
+
+.grid-toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: all 0.3s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.grid-toggle-switch.active::after {
+    left: 22px;
+}
+
+.confirm-bar {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.2s ease-out forwards;
+}
+
+.confirm-bar.show {
+    display: flex;
+}
+
+@keyframes fadeIn {
+    0% { background: rgba(0,0,0,0); }
+    100% { background: rgba(0,0,0,0.5); }
+}
+
+.confirm-modal {
+    background: #ffffff;
+    width: 100vw;
+    height: 20vh;
+    position: relative;
+    overflow: visible;
+    animation: slideInFromRight 0.1s ease-out;
+}
+
+@keyframes slideInFromRight {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(0); }
+}
+
+.confirm-modal-top-bar {
+    height: 16px;
+    background: #ff4145;
+    width: 100%;
+}
+
+.confirm-modal-content {
+    padding: 24px;
+    display: flex;
+    flex-direction: row;
+    height: calc(20vh - 16px);
+    position: relative;
+    align-items: center;
+}
+
+.about-image {
+    width: auto;
+    height: 80%;
+    max-height: calc(20vh - 48px);
+    margin-right: 24px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.confirm-bar-text {
+    color: #333333;
+    font-size: 1.2rem;
+    font-weight: 500;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    text-align: center;
+    flex: 1;
+}
+
+/* 非关于弹窗中保持原有定位 */
+.confirm-bar:not(#aboutDialog) .confirm-bar-text,
+#clearAllConfirm .confirm-bar-text,
+#clearCurrentConfirm .confirm-bar-text,
+#importConfirm .confirm-bar-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    flex: none;
+}
+
+.confirm-bar-buttons {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+}
+
+.confirm-btn {
+    padding: 8px 80px;
+    border: 5px solid white;
+    border-radius: 24px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: none;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.confirm-btn-cancel {
+    background-color: #ffef01;
+    color: #333333;
+}
+
+.confirm-btn-confirm {
+    background-color: #ff4145;
+    color: #ffffff;
+}
+
+/* 网格线层 */
+#grid-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* 更多菜单样式 */
+.more-menu {
+    display: none;
+    position: absolute;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.56), inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -1px 1px rgba(255,255,255,0.06);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 34px;
+    padding: 16px;
+    z-index: 1 !important;
+    min-width: 200px;
+    opacity: 0;
+    pointer-events: none;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.more-menu.show,
+.eraser-menu.show {
+    display: block;
+    pointer-events: auto;
+    animation: menuFloatIn 0.42s cubic-bezier(.2,.8,.2,1) forwards;
+}
+
+.more-menu.fade-out,
+.eraser-menu.fade-out {
+    display: block;
+    pointer-events: none;
+    animation: menuFloatOut 0.28s ease-in forwards;
+}
+
+.more-menu-header {
+    color: #fff;
+    font-size: 16px;
+    margin-bottom: 12px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    padding-bottom: 10px;
+    font-weight: 500;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.more-menu-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.more-menu-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 8px;
+    background: rgba(255,255,255,0.1);
+    border: none;
+    border-radius: 15px;
+    cursor: pointer;
+    transition: none;
+    color: #fff;
+    gap: 6px;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.more-menu-btn:hover {
+    background: rgba(255,255,255,0.12);
+}
+
+.more-menu-btn svg {
+    width: 24px;
+    height: 24px;
+    stroke: #fff;
+}
+
+.more-menu-btn span {
+    font-size: 12px;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    color: #fff;
+}
+
+/* 关于对话框 - 使用清除弹窗样式但无顶部红色条 */
+.about-dialog {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0);
+    z-index: 2000;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.2s ease-out forwards;
+}
+
+.about-dialog.show {
+    display: flex;
+}
+
+.about-modal {
+    background: #ffffff;
+    width: 100vw;
+    height: 20vh;
+    position: relative;
+    overflow: visible;
+    animation: slideInFromRight 0.1s ease-out;
+}
+
+.about-modal-content {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    height: 20vh;
+    position: relative;
+}
+
+.about-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #333333;
+    font-size: 1.2rem;
+    font-weight: 500;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    text-align: center;
+}
+
+.about-close-btn {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 80px;
+    border: 5px solid white;
+    border-radius: 24px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: none;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    background-color: #ffef01;
+    color: #333333;
+}
+
+/* 关于视频弹窗 */
+.video-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    background: rgba(0, 0, 0, 0.6);
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+}
+
+.video-overlay.show {
+    display: flex;
+}
+
+.video-modal {
+    position: relative;
+    width: 50vw;
+    max-width: 850px;
+    min-width: 320px;
+    background: rgba(0, 0, 0, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.video-modal video {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.video-close-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.video-close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 视频背景菜单样式 */
+.video-menu {
+    display: none;
+    position: absolute;
+    bottom: 156px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.56), inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -1px 1px rgba(255,255,255,0.06);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 14px;
+    padding: 16px;
+    z-index: 60;
+    min-width: 200px;
+    animation: menuPopIn 0.2s ease-out;
+    transition: background 0.3s ease;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.video-menu.show {
+    display: block;
+}
+
+.video-menu-header {
+    color: #fff;
+    font-size: 14px;
+    margin-bottom: 12px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    padding-bottom: 10px;
+    font-weight: 500;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.video-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 12px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.video-toggle:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.video-toggle-label {
+    color: rgba(255,255,255,0.9);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.video-toggle-switch {
+    width: 44px;
+    height: 24px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 12px;
+    position: relative;
+    transition: all 0.3s;
+}
+
+.video-toggle-switch.active {
+    background: #fff;
+}
+
+.video-toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: all 0.3s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.video-toggle-switch.active::after {
+    left: 22px;
+}
+
+.video-status {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    text-align: center;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* 透明模式或视频背景模式下：隐藏左下角隐藏按钮与右下角翻页 */
+body.transparent-mode #btn-hide,
+body.video-active #btn-hide,
+body.transparent-mode #pageNav,
+body.video-active #pageNav {
+    display: none !important;
+}
+
+/* 摄像头选择器 */
+.camera-selector {
+    margin-top: 10px;
+}
+.camera-selector-label {
+    color: rgba(255,255,255,0.7);
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+.camera-select {
+    width: 100%;
+    padding: 8px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.3);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+}
+.camera-select option {
+    background: #222;
+    color: #fff;
+}
+
+/* 视频背景菜单：旋转画面按钮 */
+.video-rotate-row {
+    margin-top: 10px;
+}
+.video-rotate-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+.video-rotate-btn:hover {
+    background: rgba(255,255,255,0.16);
+}
+.video-rotate-btn svg {
+    stroke: #fff;
+}
+.video-rotate-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* 视频背景元素 - 最底层。默认不裁切、保持原始比例（object-fit: contain）；
+   激活后尺寸/位置/旋转由 JS 按可见矩形动态设置。 */
+/* 视频背景容器 - 最底层。包裹层承载与画布同款的缩放/平移，使视频跟随画布移动。 */
+#video-bg-wrap {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+    pointer-events: none;
+    transform-origin: 0 0;
+    display: none;
+}
+#video-bg-wrap.active {
+    display: block;
+}
+/* 视频元素：在包裹层内居中，不裁切、保持原始比例；旋转由 JS 设置 */
+#video-background {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100vw;
+    height: 100vh;
+    object-fit: contain;
+    transform: translate(-50%, -50%);
+    will-change: transform;
+}
+
+#video-bg-wrap.active {
+    display: block;
+}
+
+/* 抽学号特殊视频：独立占满结果层并保持视频比例，避免受顶部栏和图片布局影响 */
+/* 工具菜单与工具栏完全共用同一层液态玻璃材质；菜单置于工具栏下方 */
+.pen-menu,
+.more-menu,
+.eraser-menu,
+.video-menu {
+    z-index: 99;
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+    box-shadow: 0 14px 36px rgba(0,0,0,0.56), inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -1px 1px rgba(255,255,255,0.06) !important;
+    backdrop-filter: blur(25px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(25px) saturate(180%) !important;
+}
+
+.pen-menu,
+.more-menu,
+.eraser-menu,
+.video-menu {
+    transform: translateX(-50%) translateY(86px);
+}
+
+@keyframes menuFloatIn {
+    from { transform: translateX(-50%) translateY(86px); opacity: 0; }
+    to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+@keyframes menuFloatOut {
+    from { transform: translateX(-50%) translateY(0); opacity: 1; }
+    to { transform: translateX(-50%) translateY(86px); opacity: 0; }
+}
+
+#lotterySpecialVideo {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 4 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    object-fit: contain;
+    background: #000;
+    pointer-events: auto;
+}
+
+.number-result.video-playing .top-bar,
+.number-result.video-playing .result-image {
+    visibility: hidden;
+}
+
+/* Canvas容器 - 中间层 (z-index: 10) */
+#canvas-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10;
+    background-color: #0f261e;
+    transition: background-color 0.3s ease;
+    /* 视频模式下鼠标工具拖动/缩放：把触摸完全交给 pointer 事件，禁用浏览器手势 */
+    touch-action: none;
+}
+
+/* 视频激活时画布容器背景变透明 */
+body.video-active #canvas-container {
+    background-color: transparent;
+}
+
+/* 主画布 - 透明背景 */
+#main-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    background-color: transparent;
+}
+
+/* 空白页水印：普通模式（非透明、非视频背景）且页面无任何内容时，居中显示。
+   50% 大小、95% 透明度；置于画布之下，笔迹绘制在其上方。默认隐藏，由 updateWatermark 控制显隐。 */
+#watermark {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 50%;
+    height: auto;
+    opacity: 0.95;
+    pointer-events: none;
+    user-select: none;
+    z-index: 5;
+    display: none;
+}
+
+#watermark.show {
+    display: block;
+}
+
+/* 清空页面时，画布内容逐步模糊并渐隐 */
+#main-canvas.canvas-clear-animating {
+    animation: canvasClearAnimation 520ms ease-out forwards;
+}
+
+@keyframes canvasClearAnimation {
+    0% {
+        filter: blur(0px);
+        opacity: 1;
+    }
+    20% {
+        filter: blur(2px);
+        opacity: 0.9;
+    }
+    40% {
+        filter: blur(4px);
+        opacity: 0.75;
+    }
+    60% {
+        filter: blur(8px);
+        opacity: 0.55;
+    }
+    80% {
+        filter: blur(12px);
+        opacity: 0.28;
+    }
+    100% {
+        filter: blur(16px);
+        opacity: 0;
+    }
+}
+
+/* 网格画布 */
+#grid-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* 确保UI元素在顶层 */
+.toolbar, .fixed.bottom-3 {
+    z-index: 100;
+}
+
+/* 版本号文字在透明模式下增加阴影提高可读性 */
+body.transparent-mode .fixed.bottom-3.left-4 {
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+/* ========== 新版弹窗样式（来自弹窗.html） ========== */
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+.overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.popup {
+    width: 600px;
+    height: 450px;
+    position: relative;
+    border-radius: 15px;
+    border: 1px solid rgba(170, 170, 170, 0.5);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(80px) scale(0.9);
+}
+.popup.entering {
+    animation: popupIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.popup.leaving {
+    animation: popupOut 0.5s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+@keyframes popupIn {
+    0% {
+        transform: translateY(80px) scale(0.9);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes popupOut {
+    0% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+    10% {
+        transform: translateY(0) scale(1);
+        opacity: 0;
+    }
+    20% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+    30% {
+        transform: translateY(0) scale(1);
+        opacity: 0;
+    }
+    40% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(60px) scale(0.9);
+        opacity: 0;
+    }
+}
+
+.popup-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+}
+
+/* 关闭按钮: 62x58 右上角, 透明仅保留判定区 */
+.close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 62px;
+    height: 58px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+}
+
+/* 文本容器: 全宽, top 59px, bottom 125px */
+.text-container {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 59px;
+    bottom: 100px;
+    padding: 20px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #37393c;
+    font-size: 24px;
+    font-family: '原装经典OS黑体', 'PingFang SC', 'Microsoft YaHei', sans-serif !important;
+    z-index: 5;
+    overflow-y: auto;
+}
+
+/* 取消按钮: 37,340 -> 295,410, 透明仅保留判定区 */
+.btn-cancel {
+    position: absolute;
+    left: 37px;
+    top: 340px;
+    width: 258px;
+    height: 70px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+}
+
+/* 确认按钮: 309,340 -> 567,410, 透明仅保留判定区 */
+.btn-ok {
+    position: absolute;
+    left: 309px;
+    top: 340px;
+    width: 258px;
+    height: 70px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+}
+.toolbar, .fixed.bottom-3 {
+    z-index: 100;
+}
+
+/* 版本号文字在透明模式下增加阴影提高可读性 */
+body.transparent-mode .fixed.bottom-3.left-4 {
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+/* ========== 橡皮擦设置菜单（再次点击橡皮擦时显示） ========== */
+.eraser-menu {
+    display: none;
+    position: absolute;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.56), inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -1px 1px rgba(255,255,255,0.06);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 34px;
+    padding: 20px;
+    z-index: 99;
+    min-width: 240px;
+    opacity: 0;
+    pointer-events: none;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+.eraser-menu.show {
+    display: block;
+}
+
+body.transparent-mode .eraser-menu {
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.56), inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -1px 1px rgba(255,255,255,0.06);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    backdrop-filter: blur(12px);
+}
+
+.eraser-menu-header {
+    color: #fff;
+    font-size: 16px;
+    margin-bottom: 16px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    padding-bottom: 12px;
+    font-weight: 500;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* 滑动清空组件 - 新版样式 */
+.slider-clear {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.slider-clear-track {
+    position: relative;
+    width: 220px;
+    height: 48px;
+    border-radius: 24px;
+    background: #ffffff50;
+    border: none;
+    overflow: hidden;
+    touch-action: none;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15), inset 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.slider-clear-knob {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    background: #ffffff48;
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    pointer-events: none;
+    will-change: transform;
+    letter-spacing: -2px;
+}
+
+.slider-clear-label {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 100%;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    pointer-events: none;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    padding-left: 40px;
+    box-sizing: border-box;
+}
+
+
+/* 抽奖特殊图片动画：从大到小 + 渐入 */
+@keyframes lotterySpecialImagePop {
+    0% {
+        opacity: 0;
+        transform: scale(2.2);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+.result-image.special-pop-anim {
+    animation: lotterySpecialImagePop 0.65s ease-out forwards;
+}
+#lotterySpecialVideo {
+    object-fit: contain;
+}
+
+
+.toolbar {
+    z-index: 2147483647 !important;
+}
+/* 工具菜单置于工具栏之下（低于按钮的 z-index:1）：滑出时从工具栏后方升起，而非盖在工具栏之上 */
+.toolbar .pen-menu,
+.toolbar .more-menu,
+.toolbar .eraser-menu,
+.toolbar .video-menu {
+    z-index: 0 !important;
+}
+/* 计时器内嵌层（更多菜单 → 计时器） */
+.timer-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 2000;
+    background: #0b0e14;
+}
+.timer-overlay iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+.timer-close-btn {
+    position: fixed;
+    bottom: 42px;
+    left: 20px;
+    z-index: 2001;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border-radius: 30px;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 2px solid rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.9);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+    user-select: none;
+}
+.timer-close-btn:hover {
+    background: rgba(255,255,255,0.25);
+    color: #fff;
+}
+
+/* ========== 透明模式深色 UI：透明模式下工具栏与工具菜单自动切至深色*/
+body.transparent-mode .toolbar::before {
+    background: rgba(30,30,36,0.65);
+    border-color: rgba(255,255,255,0.28);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.14), inset 0 -1px 1px rgba(255,255,255,0.05);
+}
+
+body.transparent-mode .pen-menu,
+body.transparent-mode .more-menu,
+body.transparent-mode .video-menu,
+body.transparent-mode .eraser-menu {
+    background: rgba(30,30,36,0.75) !important;
+    border: 1px solid rgba(255,255,255,0.28) !important;
+    box-shadow: 0 14px 36px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.14), inset 0 -1px 1px rgba(255,255,255,0.05) !important;
+    backdrop-filter: blur(25px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(25px) saturate(140%) !important;
+}
+
+/* 深色工具栏上高亮滑块略微提亮，保证选中态清晰 */
+body.transparent-mode .tool-highlight {
+    background: linear-gradient(145deg, rgba(255,255,255,0.34), rgba(255,255,255,0.14));
+    box-shadow: inset 0 1px rgba(255,255,255,0.36), 0 4px 15px rgba(0,0,0,0.2);
+}
+
+/* 深色菜单下关闭按钮改用白色，避免不可见 */
+body.transparent-mode .pen-menu-close {
+    color: rgba(255,255,255,0.7);
+}
+body.transparent-mode .pen-menu-close:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.15);
+}
+
+
+/* ========== 视频模式深色 UI：工具栏与工具菜单与透明模式一致切换至深色 ========== */
+body.video-active .toolbar::before {
+    background: rgba(30,30,36,0.65);
+    border-color: rgba(255,255,255,0.28);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.14), inset 0 -1px 1px rgba(255,255,255,0.05);
+}
+
+body.video-active .pen-menu,
+body.video-active .more-menu,
+body.video-active .video-menu,
+body.video-active .eraser-menu {
+    background: rgba(30,30,36,0.75) !important;
+    border: 1px solid rgba(255,255,255,0.28) !important;
+    box-shadow: 0 14px 36px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.14), inset 0 -1px 1px rgba(255,255,255,0.05) !important;
+    backdrop-filter: blur(25px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(25px) saturate(140%) !important;
+}
+
+body.video-active .tool-highlight {
+    background: linear-gradient(145deg, rgba(255,255,255,0.34), rgba(255,255,255,0.14));
+    box-shadow: inset 0 1px rgba(255,255,255,0.36), 0 4px 15px rgba(0,0,0,0.2);
+}
+
+body.video-active .pen-menu-close {
+    color: rgba(255,255,255,0.7);
+}
+body.video-active .pen-menu-close:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.15);
+}
+
+/* ============================================================
+   视频模式：左侧短工具栏（拍照 / 相册）
+   ============================================================ */
+#cameraToolbar {
+    position: fixed;
+    bottom: 14px;
+    left: 0;
+    z-index: 2147483647 !important;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    border-radius: 34px;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+#cameraToolbar.show {
+    display: flex;
+}
+/* 短工具栏背景：与主工具栏完全相同的液态玻璃材质 */
+#cameraToolbar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.56), inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -1px 1px rgba(255,255,255,0.06);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    z-index: -1;
+    pointer-events: none;
+}
+/* 视频模式下短工具栏与主工具栏一同切换为深色材质 */
+body.video-active #cameraToolbar::before {
+    background: rgba(30,30,36,0.65);
+    border-color: rgba(255,255,255,0.28);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.14), inset 0 -1px 1px rgba(255,255,255,0.05);
+}
+/* 短工具栏按钮直接复用主工具栏 .tool-btn / .tool-btn img 样式（纯图标、无文字） */
+
+/* ============================================================
+   视频模式：右侧相册列表面板
+   ============================================================ */
+#albumPanel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 300px;
+    max-width: 85vw;
+    z-index: 9000;
+    display: flex;
+    flex-direction: column;
+    background: rgba(20,20,24,0.72);
+    border-left: 1px solid rgba(255,255,255,0.18);
+    box-shadow: -14px 0 40px rgba(0,0,0,0.5);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.25s ease;
+}
+#albumPanel.show {
+    transform: translateX(0);
+}
+/* 面板收起（停在屏幕右侧外部）时移除阴影，避免阴影左缘漏进屏幕 */
+#albumPanel:not(.show) {
+    box-shadow: none;
+}
+.album-panel-header {
+    padding: 16px;
+    color: #fff;
+    font-size: 16px;
+    text-align: center;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+.album-list {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+}
+.album-list::-webkit-scrollbar {
+    width: 6px;
+}
+.album-list::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.2);
+    border-radius: 3px;
+}
+/* 照片只有一两张时，列表项从底部开始显示（贴向底部按钮区）；
+   内容溢出可滚动时 auto 边距解析为 0，不影响正常滚动 */
+.album-list .album-item:first-child {
+    margin-top: auto;
+}
+.album-item {
+    flex-shrink: 0;
+    width: 100%;
+    padding: 8px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+.album-item:hover {
+    background: rgba(255,255,255,0.12);
+}
+.album-item.selected {
+    background: rgba(255,255,255,0.16);
+    border-color: rgba(255,255,255,0.55);
+}
+.album-thumb {
+    display: block;
+    width: 100%;
+    height: 150px;
+    object-fit: contain;
+    background: rgba(0,0,0,0.28);
+    border-radius: 8px;
+    pointer-events: none;
+}
+.album-time {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.72);
+    text-align: center;
+    pointer-events: none;
+}
+.album-empty {
+    margin-top: 40%;
+    color: rgba(255,255,255,0.45);
+    font-size: 14px;
+    text-align: center;
+    pointer-events: none;
+}
+.album-bottom {
+    flex-shrink: 0;
+    padding: 12px;
+    display: flex;
+    gap: 10px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+}
+/* 底部按钮：背景完全透明，仅留淡边框；大圆角，无悬停效果 */
+.album-bottom-btn {
+    flex: 1;
+    padding: 12px 8px;
+    border-radius: 22px;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    touch-action: manipulation;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: none;
+}
+
+/* ============================================================
+   视频模式：拍照快门遮罩（页面变暗一下）
+   ============================================================ */
+#captureFlash {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483646; /* 高于相册面板、略低于工具栏，变暗时不遮挡工具栏 */
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* ============================================================
+   视频模式：相册照片查看元素（替换视频画面）
+   ============================================================ */
+#album-photo-view {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: none;
+    object-fit: contain;
+    pointer-events: none;
+    will-change: transform, width, height;
+}
+#album-photo-view.show {
+    display: block;
+}
+
+/* 窄屏适配：短工具栏按钮复用 .tool-btn 的窄屏缩小规则，此处仅调整容器与相册 */
+@media (max-width: 560px) {
+    #cameraToolbar {
+        gap: 4px;
+        padding: 6px;
+    }
+    #albumPanel {
+        width: 260px;
+    }
+    .album-thumb {
+        height: 130px;
+    }
+}
+/* （注：内容由AI生成） */
