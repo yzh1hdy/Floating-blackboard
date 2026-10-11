@@ -1,5 +1,4 @@
 
-        // --- 笔设置配置 ---
         const penConfig = {
             colors: [
                 { name: '白色', value: '#ffffff', default: true },
@@ -20,22 +19,20 @@
             currentSize: 2.5
         };
 
-        // --- State Management ---
         const state = {
             tool: 'pen',
             isDrawing: false,
             eraserMenuOpen: false,
             currentPage: 0,
             pages: [],
-            perfWarningThreshold: 25,
+            perfWarningThreshold: 99,
             history: [],
             historyStep: -1,
-            // ===== 矢量笔迹模型 =====
-            strokes: [],          // 当前页已完成的矢量笔画：{tool, points|几何, color, width}
-            undoStack: [],        // 撤销栈：{type:'add',stroke} | {type:'erase',removed,insertAt}
-            erasingNow: null,     // 正在被橡皮擦除的笔画引用集合（擦除手势过程中临时隐藏）
-            erasePath: null,     // 当前橡皮手势扫过的点列
-            currentStroke: null,  // 正在用笔画的笔矢量对象
+            strokes: [],
+            undoStack: [],
+            erasingNow: null,
+            erasePath: null,
+            currentStroke: null,
             eraserRadius: 25,
             penMenuOpen: false,
             moreMenuOpen: false,
@@ -44,63 +41,53 @@
             canvas: null,
             ctx: null,
             dpr: 1,
-            isPlayingSpecialVideo: false, //标记正在播放特殊视频
+            isPlayingSpecialVideo: false,
             lotteryImagePath: "",
             lotteryStudentNum: "",
             pendingAddPage: false,
+            pendingDoublePageAdd: false,
             currentStrokePoints: [],
-            // 绘制优化相关
             isDrawingFrame: false,
             pendingPoints: [],
-            // 网格线
             gridEnabled: false,
             gridSize: 30,
             gridCanvas: null,
             gridCtx: null,
-            // 自动校正开关状态
             autoCorrectionEnabled: false,
-            // 存储绘制的圆信息（用于吸附）
             circles: [],
-            // 存储直线的端点信息（用于吸附）
             lines: [],
-            // 图形绘制模式
             shapeMode: null, // 'circle', 'line', 'dashed'
             shapeStartPoint: null,
             shapePreviewCanvas: null,
             shapePreviewCtx: null,
-            // 视频背景状态
             videoBackgroundEnabled: false,
             videoStream: null,
-            selectedCameraId: null, // 用户选择的摄像头 deviceId
-            // 视频模式增强：旋转次数(每次顺时针90°)、视频宽高比、画布缩放/平移、基础矩形
+            selectedCameraId: null,
             videoRotation: 0,            // 0/1/2/3，每次顺时针90°
-            videoAspect: 16 / 9,         // 视频宽/高，元数据就绪后更新
-            videoView: { scale: 1, tx: 0, ty: 0 }, // 鼠标工具下画布缩放/平移
-            videoRect: null,             // 视频模式下画布的基础矩形（未缩放/平移）
-            // 透明背景模式
+            videoAspect: 16 / 9,
+            videoView: { scale: 1, tx: 0, ty: 0 },
+            videoRect: null,
             transparentMode: false,
-            // 超大橡皮擦模式
             isMegaEraser: false,
-            megaEraserThreshold: 400, // 超大橡皮擦触发阈值 px²
-            megaEraserRadius: 100,    // 超大橡皮擦半径
-            normalEraserRadius: 25,     // 普通橡皮擦半径
-            touchStartArea: 0,          // 触控起始面积
-            touchStartTime: 0,          // 触控起始时间
-            // 超大橡皮擦预览层
+            megaEraserThreshold: 400, // 触发阈值 px²
+            megaEraserRadius: 100,
+            normalEraserRadius: 25,
+            touchStartArea: 0,
+            touchStartTime: 0,
             megaEraserPreviewCanvas: null,
             megaEraserPreviewCtx: null,
-            // 进入橡皮工具前正在使用的工具（笔/鼠标），用于橡皮菜单滑动清空后自动恢复
             preEraserTool: 'pen',
-            // 鼠标穿透状态（透明模式 + 鼠标工具）
-            mousePassthrough: false,   // 是否已向宿主开启点击穿透
-            passthroughBlockCount: 0,  // 打开中的覆盖层计数（更多菜单/抽奖结果/计时器等），>0 时临时取消穿透
-            // 撤回上限：超出后丢弃最旧记录，防止撤销栈无限增长
-            undoLimit: 100
+            mousePassthrough: false,
+            passthroughBlockCount: 0,  // 打开中的覆盖层计数，>0 时临时取消穿透
+            undoLimit: 100,
+            normalScrollY: 0,
+            normalScrollLimit: 5400,
+            doublePageMode: false,
+            pendingDoublePage: false,
+            activeDoublePage: 0
         };
 
-        // --- 抽学号配置 ---
-        // 毫秒前两位(0-99)到学号的映射表（来自工作簿1.xlsx）
-        // 毫秒前两位(0-99)到学号的映射表（1-37循环）
+        // 毫秒前两位(0-99)到学号的映射表
         const msToStudentMap = {
             0: '01', 1: '02', 2: '03', 3: '04', 4: '05', 5: '37', 6: '07', 7: '08', 8: '09', 9: '10',
             10: '11', 11: '12', 12: '13', 13: '14', 14: '15', 15: '16', 16: '17', 17: '18', 18: '19', 19: '20',
@@ -114,7 +101,6 @@
             90: '17', 91: '18', 92: '19', 93: '20', 94: '21', 95: '22', 96: '23', 97: '24', 98: '25', 99: '26'
         };
 
-        // --- DOM Elements ---
         const container = document.getElementById('canvas-container');
         const pageIndicator = document.getElementById('pageIndicator');
         const penMenu = document.getElementById('penMenu');

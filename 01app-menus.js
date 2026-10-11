@@ -1,4 +1,3 @@
-// --- 初始化笔设置菜单 ---
 function initPenMenu() {
     const palette = document.getElementById('colorPalette');
     penConfig.colors.forEach((color, index) => {
@@ -54,8 +53,8 @@ function handlePenClick() {
 }
 
 function openPenMenu() {
-    closeMoreMenu(false); // 切换菜单时立即隐藏，避免其他菜单闪现
-    closeVideoMenu(false); // 关闭视频菜单
+    closeMoreMenu(false);
+    closeVideoMenu(false);
     if (penMenu._closeTimer) window.clearTimeout(penMenu._closeTimer);
     state.penMenuOpen = true;
     penMenu.classList.remove('fade-out');
@@ -65,8 +64,8 @@ function openPenMenu() {
 function closePenMenu(animate = true) {
     state.penMenuOpen = false;
     if (penMenu._closeTimer) window.clearTimeout(penMenu._closeTimer);
-    penMenu.classList.remove('show', 'fade-out');  // 先移除所有动画类
-    if (!animate) return;  // 立即关闭时直接返回，不添加动画
+    penMenu.classList.remove('show', 'fade-out');
+    if (!animate) return;
     penMenu.classList.add('fade-out');
     penMenu._closeTimer = window.setTimeout(() => {
         penMenu.classList.remove('fade-out');
@@ -75,9 +74,7 @@ function closePenMenu(animate = true) {
 }
 
 
-// --- 更多菜单功能 ---
 function handleMoreClick(e) {
-    // 获取事件对象（兼容不同浏览器）
     var event = e || window.event;
     if (event) {
         event.stopPropagation();
@@ -92,16 +89,13 @@ function handleMoreClick(e) {
 }
 
 function openMoreMenu() {
-    closePenMenu(false); // 切换菜单时立即隐藏，避免其他菜单闪现
-    closeVideoMenu(false); // 关闭视频菜单
+    closePenMenu(false);
+    closeVideoMenu(false);
     if (moreMenu._closeTimer) window.clearTimeout(moreMenu._closeTimer);
     state.moreMenuOpen = true;
     moreMenu.classList.remove('fade-out');
     moreMenu.classList.add('show');
-    // 【透明模式】打开更多菜单时临时取消鼠标穿透，避免菜单交互穿透到桌面
     if (typeof suspendMousePassthrough === 'function') suspendMousePassthrough();
-    // 已移除菜单打开时的图标高亮（图片高亮）
-    // 更新透明模式按钮文本
     const textEl = document.getElementById('transparentModeText');
     if (textEl) {
         textEl.textContent = state.transparentMode ? '退出透明' : '透明模式';
@@ -113,7 +107,7 @@ function closeMoreMenu(animate = true) {
     state.moreMenuOpen = false;
     if (moreMenu._closeTimer) window.clearTimeout(moreMenu._closeTimer);
     moreMenu.classList.remove('show', 'fade-out');
-    // 【透明模式】更多菜单从打开态关闭时恢复鼠标穿透（仅确实打开过才恢复，避免穿透计数失衡）
+    // 仅确实打开过才恢复穿透，避免计数失衡
     if (wasOpen && typeof resumeMousePassthrough === 'function') {
         resumeMousePassthrough();
     }
@@ -134,27 +128,21 @@ function closeAllMenus(animate = true) {
     }
 }
 
-// 点击外部关闭菜单
 document.addEventListener('click', (e) => {
-    // 关闭笔设置菜单
     if (state.penMenuOpen && !e.target.closest('#tool-pen') && !e.target.closest('#penMenu')) {
         closePenMenu();
     }
-    // 关闭更多菜单
     if (state.moreMenuOpen && !e.target.closest('#btn-more') && !e.target.closest('#moreMenu')) {
         closeMoreMenu();
     }
-    // 关闭视频菜单
     if (state.videoMenuOpen && !e.target.closest('#btn-video') && !e.target.closest('#videoMenu')) {
         closeVideoMenu();
     }
-    // 关闭橡皮擦菜单
     if (state.eraserMenuOpen && !e.target.closest('#tool-eraser') && !e.target.closest('#eraserMenu')) {
         closeEraserMenu();
     }
 });
 
-// --- 橡皮擦点击逻辑：未选中则选中；已选中再次点击则打开/关闭滑动清空菜单 ---
 function handleEraserClick() {
     if (state.tool === 'eraser') {
         if (state.eraserMenuOpen) {
@@ -166,7 +154,6 @@ function handleEraserClick() {
         setTool('eraser');
     }
 }
-// --- 打开橡皮擦菜单 ---
 function openEraserMenu() {
     closePenMenu(false);
     closeMoreMenu(false);
@@ -176,7 +163,6 @@ function openEraserMenu() {
     eraserMenu.classList.add('show');
     resetSliderClear();
 }
-// --- 关闭橡皮擦菜单 ---
 function closeEraserMenu(animate = true) {
     state.eraserMenuOpen = false;
     eraserMenu.classList.remove('show');
@@ -189,12 +175,10 @@ function closeEraserMenu(animate = true) {
     window.setTimeout(() => eraserMenu.classList.remove('fade-out'), 420);
     resetSliderClear();
 }
-// --- 重置滑动条 ---
 function resetSliderClear() {
     const knob = document.getElementById('sliderClearKnob');
     if (knob) knob.style.transform = 'translateX(0)';
 }
-// --- 初始化滑动清空组件（Pointer Events，兼容希沃触屏与鼠标） ---
 (function initSliderClear() {
     const track = document.getElementById('sliderClearTrack');
     const knob = document.getElementById('sliderClearKnob');
@@ -233,18 +217,15 @@ function resetSliderClear() {
         if (p >= 0.7) {
             triggered = true;
             dragging = false;
-            // 滑动到底：清空当前页
             if (typeof executeClear === 'function') {
                 executeClear();
             }
-            // 淡出动画后关闭菜单
             eraserMenu.classList.add('fade-out');
             setTimeout(function() {
                 closeEraserMenu();
                 eraserMenu.classList.remove('fade-out');
             }, 300);
-            // 清空后自动切回工具：透明模式下始终切回鼠标工具；
-            // 非透明模式下切回进入橡皮前使用的工具（原为鼠标则切回鼠标，否则仍为笔）
+            // 清空后：透明模式切回鼠标；非透明模式切回进入橡皮前的工具
             var restoreTool = state.transparentMode ? 'mouse' : ((state.preEraserTool === 'mouse') ? 'mouse' : 'pen');
             if (typeof setTool === 'function') {
                 setTool(restoreTool);
@@ -266,7 +247,6 @@ function resetSliderClear() {
     track.addEventListener('pointercancel', onPointerEnd);
 })();
 
-// --- 透明模式切换功能 ---
 function toggleTransparentMode() {
     // 透明模式与视频背景互斥：开启透明前先关闭视频背景
     if (!state.transparentMode && state.videoBackgroundEnabled) {
@@ -274,39 +254,43 @@ function toggleTransparentMode() {
         clearCanvasImmediate();
         if (typeof syncVideoLayout === 'function') syncVideoLayout();
     }
+    // 开启透明模式时关闭函数绘图器
+    if (!state.transparentMode && typeof closeDesmos === 'function') {
+        closeDesmos();
+    }
     state.transparentMode = !state.transparentMode;
     if (state.transparentMode) {
+        // 开启透明模式时自动退出双页书写，回到单页模式
+        if (typeof exitDoublePageMode === 'function') exitDoublePageMode();
         enableTransparentMode();
+        if (typeof resetNormalScrollY === 'function') resetNormalScrollY();
         setPenColor('#ff1000', findColorBtn('#ff1000'));
+        // 进入透明模式时若当前已是鼠标工具，setTool 不会再次触发，需主动通知 webview 开启点击穿透
+        if (state.tool === 'mouse' && typeof enableMousePassthrough === 'function') {
+            enableMousePassthrough();
+        }
     } else {
         disableTransparentMode();
         setPenColor('#ffffff', findColorBtn('#ffffff'));
-        // 退出透明模式：非透明模式下鼠标按钮不生效，同步关闭鼠标穿透
         disableMousePassthrough();
     }
-    // 更新菜单按钮文本
     const textEl = document.getElementById('transparentModeText');
     if (textEl) {
         textEl.textContent = state.transparentMode ? '退出透明' : '透明模式';
     }
-    // 透明模式切换后刷新水印显隐（透明模式下不显示水印）
     if (typeof updateWatermark === 'function') updateWatermark();
-    // 关闭更多菜单
     closeMoreMenu();
 }
-// --- 启用透明模式 ---
 function enableTransparentMode() {
     document.body.classList.add('transparent-mode');
     document.body.style.backgroundColor = 'transparent';
     console.log('透明背景模式已启用');
 }
-// --- 禁用透明模式 ---
 function disableTransparentMode() {
     document.body.classList.remove('transparent-mode');
     document.body.style.backgroundColor = '#0f261e';
     console.log('透明背景模式已禁用');
 }
-// --- 视频背景功能（从更多菜单打开）---
 function showVideoMenuFromMore() {
     closeMoreMenu();
     openVideoMenu();
@@ -315,7 +299,6 @@ function openVideoMenu() {
     closePenMenu();
     state.videoMenuOpen = true;
     videoMenu.classList.add('show');
-    // 打开菜单时枚举摄像头列表（权限已授予后会显示设备标签）
     enumerateCameras();
 }
 function closeVideoMenu() {
@@ -323,7 +306,22 @@ function closeVideoMenu() {
     videoMenu.classList.remove('show');
 }
 
-// --- 立即清空当前画布（无动画）：进入/退出视频模式、旋转画面时调用 ---
+function confirmExitVideoMode() {
+    openPopup('exitVideoConfirmOverlay', 'exitVideoConfirmPopup');
+}
+function closeExitVideoModal() {
+    closePopup('exitVideoConfirmOverlay', 'exitVideoConfirmPopup');
+}
+function handleExitVideoOverlayClick(e) {
+    if (e.target === document.getElementById('exitVideoConfirmOverlay')) closeExitVideoModal();
+}
+function executeExitVideo() {
+    closePopup('exitVideoConfirmOverlay', 'exitVideoConfirmPopup');
+    stopCamera();
+    clearCanvasImmediate();
+    if (typeof syncVideoLayout === 'function') syncVideoLayout();
+}
+
 function clearCanvasImmediate() {
     if (state.canvas && state.ctx) {
         state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
@@ -331,12 +329,12 @@ function clearCanvasImmediate() {
     state.strokes = [];
     state.undoStack = [];
     state.erasingNow = new Set();
+    if (typeof resetNormalScrollY === 'function') resetNormalScrollY();
     if (state.pages && typeof state.currentPage === 'number') {
         state.pages[state.currentPage] = null;
     }
 }
 
-// --- 停止摄像头并复位 UI ---
 function stopCamera() {
     if (state.videoStream) {
         state.videoStream.getTracks().forEach(track => track.stop());
@@ -345,50 +343,90 @@ function stopCamera() {
     videoBackground.srcObject = null;
     videoWrap.classList.remove('active');
     videoBackground.style.transform = '';
-    state.videoRotation = 0; // 退出视频模式复位旋转
+    state.videoRotation = 0;
     document.body.classList.remove('video-active');
     state.videoBackgroundEnabled = false;
-    // 从视频模式切回普通模式：笔粗细自动切回默认的第二档（2.5）
+    // 退出视频背景回普通模式：笔颜色自动切回白色
+    if (typeof setPenColor === 'function') setPenColor('#ffffff', findColorBtn('#ffffff'));
     if (typeof setPenSize === 'function') setPenSize(penConfig.sizes[1]);
     const switchEl = document.getElementById('videoToggleSwitch');
     if (switchEl) switchEl.classList.remove('active');
     const statusEl = document.getElementById('videoStatus');
     if (statusEl) statusEl.textContent = '摄像头已关闭';
-    // 真正退出视频模式（非切换摄像头）：通知相册模块收起短工具栏/面板与照片
+    // 非切换摄像头时才通知相册模块收起
     if (!state.switchingCamera && typeof window.onVideoModeExited === 'function') {
         try { window.onVideoModeExited(); } catch (_) { }
     }
 }
 
-// --- 启动摄像头（优先使用用户选择的设备）---
+const CAMERA_PREFERRED_WIDTH = 3840;
+const CAMERA_PREFERRED_HEIGHT = 2160;
+
+function buildCameraConstraints() {
+    const constraints = {
+        video: {
+            width: { ideal: CAMERA_PREFERRED_WIDTH },
+            height: { ideal: CAMERA_PREFERRED_HEIGHT }
+        },
+        audio: false
+    };
+    if (state.selectedCameraId) {
+        constraints.video.deviceId = { exact: state.selectedCameraId };
+    } else {
+        constraints.video.facingMode = 'environment';
+    }
+    return constraints;
+}
+
+// 4K 只是首选软限制；Chromium 支持 getCapabilities 时读取摄像头实际最大分辨率，
+// 若设备支持 4K 以上（例如 5K/8K），继续用 ideal 请求设备可提供的最高分辨率。
+async function maximizeCameraResolution(track) {
+    if (!track || typeof track.applyConstraints !== 'function') return null;
+
+    let targetWidth = CAMERA_PREFERRED_WIDTH;
+    let targetHeight = CAMERA_PREFERRED_HEIGHT;
+
+    try {
+        if (typeof track.getCapabilities === 'function') {
+            const caps = track.getCapabilities();
+            if (caps.width && caps.width.max) targetWidth = caps.width.max;
+            if (caps.height && caps.height.max) targetHeight = caps.height.max;
+        }
+        await track.applyConstraints({
+            width: { ideal: targetWidth },
+            height: { ideal: targetHeight }
+        });
+    } catch (err) {
+        console.warn('提升摄像头分辨率失败，保留浏览器已分配的分辨率:', err);
+    }
+
+    return typeof track.getSettings === 'function' ? track.getSettings() : null;
+}
+
 async function startCamera(statusEl, switchEl) {
     try {
         statusEl.textContent = '正在请求摄像头权限...';
-        const constraints = {
-            video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
-            audio: false
-        };
-        if (state.selectedCameraId) {
-            constraints.video.deviceId = { exact: state.selectedCameraId };
-        } else {
-            constraints.video.facingMode = 'environment';
-        }
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const stream = await navigator.mediaDevices.getUserMedia(buildCameraConstraints());
         state.videoStream = stream;
         videoBackground.srcObject = stream;
         videoWrap.classList.add('active');
         document.body.classList.add('video-active');
         state.videoBackgroundEnabled = true;
         switchEl.classList.add('active');
+        // 开启视频/展台模式时自动退出双页书写，回到单页模式
+        if (typeof exitDoublePageMode === 'function') exitDoublePageMode();
+        // 开启视频背景模式：笔颜色自动切为红色
+        if (typeof setPenColor === 'function') setPenColor('#ff1000', findColorBtn('#ff1000'));
         const track = stream.getVideoTracks()[0];
-        statusEl.textContent = '摄像头已开启' + (track && track.label ? '：' + track.label : '');
-        // 权限获取后重新枚举，以拿到设备标签
+        const settings = await maximizeCameraResolution(track);
+        const resolution = settings && settings.width && settings.height
+            ? '（' + settings.width + '×' + settings.height + '）'
+            : '';
+        statusEl.textContent = '摄像头已开启' + resolution + (track && track.label ? '：' + track.label : '');
         await enumerateCameras();
-        // 视频模式：画布绑定到视频可见矩形
         if (state.videoBackgroundEnabled && typeof syncVideoLayout === 'function') {
             syncVideoLayout();
         }
-        // 视频模式已进入：显示拍照/相册短工具栏并刷新相册列表
         if (typeof window.onVideoModeEntered === 'function') {
             try { window.onVideoModeEntered(); } catch (_) { }
         }
@@ -401,33 +439,29 @@ async function startCamera(statusEl, switchEl) {
     }
 }
 
-// --- 应用视频旋转：不裁切、保持原始比例，画面顺时针旋转90°的整数倍 ---
 function applyVideoRotation() {
-    // 相册查看态：画面为已烤入方向的照片，由相册模块按自身宽高比布局，不走旋转
+    // 相册查看态由相册模块自身布局，不走旋转
     if (typeof window.applyAlbumPhotoLayout === 'function' && applyAlbumPhotoLayout()) return;
     if (!videoBackground || !videoWrap) return;
     const r = computeVideoVisibleRect();
-    // 包裹层定位到视频可见矩形（与画布容器同矩形、同变换原点，从而跟随画布缩放/平移）
     videoWrap.style.left = r.x + 'px';
     videoWrap.style.top = r.y + 'px';
     videoWrap.style.width = r.width + 'px';
     videoWrap.style.height = r.height + 'px';
     const rot = ((state.videoRotation || 0) % 4 + 4) % 4;
     let w, h;
-    if (rot === 1 || rot === 3) { w = r.height; h = r.width; } // 旋转±90°时宽高互换
+    if (rot === 1 || rot === 3) { w = r.height; h = r.width; }
     else { w = r.width; h = r.height; }
     videoBackground.style.width = w + 'px';
     videoBackground.style.height = h + 'px';
-    // 视频元素在包裹层内居中，再旋转
     videoBackground.style.transform = 'translate(-50%, -50%) rotate(' + (rot * 90) + 'deg)';
     videoBackground.style.objectFit = 'cover';
     videoBackground.style.objectPosition = 'center center';
 }
 
-// --- 视频背景设置菜单：旋转画面，点一下顺时针旋转90° ---
 function rotateVideoCW() {
     if (!state.videoBackgroundEnabled) return;
-    // 正在查看相册照片时先返回相机，避免照片方向（已烤入旧旋转）与新旋转不一致
+    // 先返回相机，避免照片已烤入的旧旋转与新旋转不一致
     if (state.albumViewing && typeof window.returnToCamera === 'function') {
         returnToCamera();
     }
@@ -436,7 +470,6 @@ function rotateVideoCW() {
     if (typeof syncVideoLayout === 'function') syncVideoLayout();
 }
 
-// --- 枚举摄像头并填充下拉框；多于一个摄像头时才显示选择器 ---
 async function enumerateCameras() {
     const select = document.getElementById('cameraSelect');
     const container = document.getElementById('cameraSelector');
@@ -460,13 +493,12 @@ async function enumerateCameras() {
     }
 }
 
-// --- 用户在下拉框中切换摄像头 ---
 async function onCameraChanged(deviceId) {
     state.selectedCameraId = deviceId || null;
     if (state.videoBackgroundEnabled) {
         const statusEl = document.getElementById('videoStatus');
         const switchEl = document.getElementById('videoToggleSwitch');
-        // 标记为切换摄像头：stopCamera 不触发相册 UI 收起，避免工具栏/面板闪动
+        // 标记切换摄像头：stopCamera 不收起相册 UI，避免闪动
         state.switchingCamera = true;
         try {
             stopCamera();
@@ -481,7 +513,13 @@ async function toggleVideoBackground() {
     const switchEl = document.getElementById('videoToggleSwitch');
     const statusEl = document.getElementById('videoStatus');
     if (!state.videoBackgroundEnabled) {
-        // 互斥：开启视频背景前先关闭透明模式
+        // 函数绘图器打开时不允许开启视频/展台模式
+        if (typeof isDesmosOpen === 'function' && isDesmosOpen()) {
+            if (switchEl) switchEl.classList.remove('active');
+            if (statusEl) statusEl.textContent = '函数绘图器打开时不可开启展台模式';
+            return;
+        }
+        // 互斥：开启视频前先关闭透明模式
         if (state.transparentMode) {
             disableTransparentMode();
             disableMousePassthrough();
@@ -490,25 +528,30 @@ async function toggleVideoBackground() {
             if (textEl) textEl.textContent = '透明模式';
         }
         await startCamera(statusEl, switchEl);
-        // 进入视频模式：自动清空画布
         if (state.videoBackgroundEnabled) {
+            // 首次打开视频背景时，画面默认顺时针转 90 度
+            if (!state.videoAutoRotatedOnce) {
+                state.videoAutoRotatedOnce = true;
+                state.videoRotation = 1;
+            }
             clearCanvasImmediate();
             if (typeof syncVideoLayout === 'function') syncVideoLayout();
         }
     } else {
         stopCamera();
-        // 退出视频模式：自动清空画布并恢复全屏布局
         clearCanvasImmediate();
         if (typeof syncVideoLayout === 'function') syncVideoLayout();
     }
 }
-// --- 关于对话框 ---
 function showAbout() {
     closeMoreMenu();
     aboutDialog.classList.add('show');
+    // 关于弹窗打开期间挂起点击穿透，否则透明模式下弹窗无法点击
+    if (typeof suspendMousePassthrough === 'function') suspendMousePassthrough();
 }
 function closeAbout() {
     aboutDialog.classList.remove('show');
+    if (typeof resumeMousePassthrough === 'function') resumeMousePassthrough();
 }
 function closeAboutOnOverlay(e) {
     if (e.target === aboutDialog) {
@@ -541,26 +584,34 @@ function closeAboutVideo(e) {
     video.pause();
     video.currentTime = 0;
 }
-// --- 重置黑板功能 ---
 function confirmResetAll() {
     closeAbout();
     document.getElementById('resetAllConfirmBar').classList.add('show');
+    // 重置确认条显示期间同样挂起点击穿透
+    if (typeof suspendMousePassthrough === 'function') suspendMousePassthrough();
 }
 function closeResetAllModal() {
     document.getElementById('resetAllConfirmBar').classList.remove('show');
+    if (typeof resumeMousePassthrough === 'function') resumeMousePassthrough();
 }
 function executeResetAll() {
-    // 清空所有页面数据
+    // 重置页面时同步退出双页书写，回到单页，避免翻页被双页路由卡住
+    if (state.doublePageMode) {
+        state.doublePageMode = false;
+        state.activeDoublePage = 0;
+        const overlay = document.getElementById('doublePageOverlay');
+        if (overlay) overlay.classList.remove('active');
+        const sw = document.getElementById('doublePageSwitch');
+        if (sw) sw.classList.remove('active');
+    }
     state.pages = [null];
     state.currentPage = 0;
     state.strokes = [];
     state.undoStack = [];
     state.erasingNow = new Set();
-    // 清空当前画布
     if (state.ctx && state.canvas) {
         state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
     }
-    // 更新UI
     updateUI();
     closeResetAllModal();
 }

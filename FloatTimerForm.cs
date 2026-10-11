@@ -10,7 +10,10 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -50,11 +53,19 @@ namespace _01
         private bool hasWhiteboardScreenshot;
         private string? lastWhiteboardScreenshotPath;
         private NotifyIcon trayIcon;
-        private PictureBox btnToggle;
         private Form btnForm;
         private bool expanded = false;
         private readonly Point btnPos;
         private readonly Size btnSize;
+
+        // 外部信号监听：重复启动带 --video 参数时打开 html 视频模式
+        private EventWaitHandle? _openVideoSignal;
+        private volatile bool _signalThreadRunning;
+
+        // 退出验证（托盘退出时的 0721 手写验证）相关
+        private Form verifyLayer;
+        private WebView2 verifyWebView;
+        private bool verifyActive;
 
         private readonly System.Windows.Forms.Timer topMostTimer;
         private readonly System.Windows.Forms.Timer focusCheckTimer;
@@ -128,7 +139,7 @@ namespace _01
             var scr = Screen.PrimaryScreen.WorkingArea;
             btnPos = new Point(scr.Left, scr.Bottom - btnSize.Height - 30);
 
-            #region 3. 按钮窗口：普通 TopMost + Region 镂空，可点击穿透
+            #region 3. 按钮窗口：逐像素 Alpha 分层窗口，半透明边缘直接与桌面混合
             btnForm = new Form
             {
                 Size = btnSize,
@@ -138,22 +149,13 @@ namespace _01
                 ShowInTaskbar = false,
                 Text = "",
                 BackColor = Color.Black,
-                StartPosition = FormStartPosition.Manual
+                StartPosition = FormStartPosition.Manual,
+                Cursor = Cursors.Hand
             };
             SetToolWindow(btnForm.Handle);
-
-            btnToggle = new PictureBox
-            {
-                Image = Image.FromFile(imgExpand),
-                SizeMode = PictureBoxSizeMode.AutoSize,
-                BackColor = Color.Transparent,
-                Cursor = Cursors.Hand,
-                Location = Point.Empty
-            };
-            btnToggle.Click += (_, _) => Toggle();
-
-            btnForm.Controls.Add(btnToggle);
-            SetButtonRegion(btnForm, (Bitmap)btnToggle.Image);
+            EnableLayeredWindow(btnForm);
+            btnForm.Click += (_, _) => Toggle();
+            SetLayeredButtonImage(btnForm, imgExpand);
             btnForm.Show();
             #endregion
 
@@ -242,6 +244,10 @@ namespace _01
             // 移除启动完成通知
             // ShowBalloonTip("Interactive Blackboard", "白板启动成功，可在托盘中操作");
 
+            #region 11. 外部信号监听：重复启动带 --video 参数时打开 html 视频模式
+            StartOpenVideoSignalListener();
+            #endregion
+
             _ = AutoToggleWebViewAsync();
         }
 
@@ -263,6 +269,122 @@ namespace _01
                 Toggle();
             }
         }
+
+        #region 外部信号监听（重复启动带 --video 参数时打开 html 视频模式）
+        /// <summary>
+        /// 启动后台线程监听命名事件：第二个实例带 --video 参数重复启动时，
+        /// 由 Program.Main 向该事件发信号，本方法收到后切换到 UI 线程打开 html 视频模式。
+        /// </summary>
+        private void StartOpenVideoSignalListener()
+        {
+            try
+            {
+                _openVideoSignal = new EventWaitHandle(false, EventResetMode.AutoReset,
+                    @"Global\MyFloatWebViewTimer_7E7E7E7E_OpenVideo",
+                    out bool createdNew);
+
+                // 仅在本实例首次创建事件时设置权限：授予所有用户/所有会话(Everyone)
+                // 完全访问权限。当程序由"计划任务"开机自启时，运行会话/完整性级别可能
+                // 与用户随后手动启动的第二个实例不一致，导致后者 OpenExisting/Set 时被
+                // 拒绝，从而只触发防重复提示而无法通知打开视频模式。显式放宽 DACL 后，
+                // 任意会话/完整性级别的进程都能打开并发送该信号。
+                if (createdNew)
+                {
+                    var eventSecurity = new EventWaitHandleSecurity();
+                    eventSecurity.AddAccessRule(new EventWaitHandleAccessRule(
+                        new SecurityIdentifier(WellKnownSidType.WorldSid, null),
+                        EventWaitHandleRights.FullControl,
+                        AccessControlType.Allow));
+                    try { _openVideoSignal.SetAccessControl(eventSecurity); } catch { }
+                }
+                _signalThreadRunning = true;
+
+                var t = new Thread(() =>
+                {
+                    while (_signalThreadRunning)
+                    {
+                        try
+                        {
+                            _openVideoSignal?.WaitOne();
+                        }
+                        catch
+                        {
+                            break;
+                        }
+                        if (!_signalThreadRunning) break;
+                        try
+                        {
+                            this.BeginInvoke(new Action(async () =>
+                            {
+                                await OpenVideoModeFromExternalAsync();
+                            }));
+                        }
+                        catch { }
+                    }
+                })
+                { IsBackground = true };
+                t.Start();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"启动外部信号监听失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 在 UI 线程上打开 html 视频背景（展台/视频模式）
+        /// </summary>
+        private async Task OpenVideoModeFromExternalAsync()
+        {
+            if (IsDisposed) return;
+            try
+            {
+                // 1. 若白板未展开，先展开
+                if (!expanded)
+                {
+                    Toggle();
+                }
+
+                // 2. 等待 webLayer 可见且 webView 核心就绪（最多约 3 秒）
+                for (int i = 0; i < 30; i++)
+                {
+                    if (IsDisposed) return;
+                    if (webLayer != null && !webLayer.IsDisposed && webLayer.Visible &&
+                        webView?.CoreWebView2 != null)
+                        break;
+                    await Task.Delay(100);
+                }
+
+                if (IsDisposed) return;
+                if (webLayer == null || webLayer.IsDisposed || webView?.CoreWebView2 == null)
+                    return;
+
+                // 3. 置顶显示白板
+                webLayer.Show();
+                ForceWebLayerTopMost();
+                ForceWindowToFront(webLayer.Handle);
+                btnForm.Hide();
+
+                // 4. 若视频背景未开启，调用 HTML 的 toggleVideoBackground() 打开展台/视频模式
+                await webView.CoreWebView2.ExecuteScriptAsync(
+                    "if(typeof state!=='undefined' && state && !state.videoBackgroundEnabled){ toggleVideoBackground(); }");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"外部触发打开视频模式失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 停止信号监听并释放命名事件（在 CleanupResources 中调用）
+        /// </summary>
+        private void StopOpenVideoSignalListener()
+        {
+            _signalThreadRunning = false;
+            try { _openVideoSignal?.Dispose(); } catch { }
+            _openVideoSignal = null;
+        }
+        #endregion
 
         #region 配置管理
         private void LoadConfig()
@@ -365,7 +487,7 @@ namespace _01
 
             menu.Items.Add("重启程序", null, (_, _) => RestartApplication());
             menu.Items.Add("-");
-            menu.Items.Add("退出程序", null, (_, _) => { trayIcon.Visible = false; Application.Exit(); });
+            menu.Items.Add("退出程序", null, (_, _) => ShowExitVerification());
 
             trayIcon.ContextMenuStrip = menu;
 
@@ -374,6 +496,121 @@ namespace _01
         }
         #endregion
 
+
+        #region 退出验证（托盘退出时的手写验证窗口）
+        private void ShowExitVerification()
+        {
+            if (verifyActive) return;
+            if (verifyLayer != null && !verifyLayer.IsDisposed) return;
+
+            try
+            {
+                Rectangle wa = Screen.PrimaryScreen.WorkingArea;
+                const int vw = 400, vh = 160;
+
+                verifyLayer = new Form
+                {
+                    FormBorderStyle = FormBorderStyle.None,
+                    TopMost = true,
+                    ShowInTaskbar = false,
+                    Text = "退出验证",
+                    BackColor = Color.Black,
+                    StartPosition = FormStartPosition.Manual,
+                    Bounds = new Rectangle(wa.Right - vw, wa.Bottom - vh, vw, vh)
+                };
+
+                verifyWebView = new WebView2
+                {
+                    Dock = DockStyle.Fill,
+                    Visible = true,
+                    DefaultBackgroundColor = Color.Transparent
+                };
+                verifyLayer.Controls.Add(verifyWebView);
+                verifyActive = true;
+
+                verifyWebView.CoreWebView2InitializationCompleted += (s, e) =>
+                {
+                    if (e.IsSuccess)
+                    {
+                        verifyWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+                        verifyWebView.CoreWebView2.Navigate(
+                            new Uri(ResolveHtmlPath("0721手写检测.html")).AbsoluteUri);
+                    }
+                };
+                verifyWebView.WebMessageReceived += HandleVerifyMessage;
+
+                if (_webViewEnvironment != null)
+                    _ = verifyWebView.EnsureCoreWebView2Async(_webViewEnvironment);
+                else
+                    _ = verifyWebView.EnsureCoreWebView2Async();
+
+                verifyLayer.Show();
+                verifyLayer.Activate();
+            }
+            catch (Exception ex)
+            {
+                CloseVerifyLayer();
+                ShowBalloonTip("退出验证", "无法打开验证窗口: " + ex.Message);
+            }
+        }
+
+        // 处理验证窗口 HTML 上报的消息（verifyResult / verifyCancel）
+        private void HandleVerifyMessage(object sender, CoreWebView2WebMessageReceivedEventArgs e)
+        {
+            try
+            {
+                string message = e.TryGetWebMessageAsString();
+                if (string.IsNullOrEmpty(message)) return;
+                using var doc = JsonDocument.Parse(message);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("type", out var typeProp)) return;
+                string type = typeProp.GetString() ?? "";
+                bool ok = root.TryGetProperty("ok", out var okProp) && okProp.GetBoolean();
+
+                this.Invoke(new Action(() =>
+                {
+                    if (type == "verifyResult")
+                    {
+                        if (ok)
+                        {
+                            // 手写正确：关闭验证窗口并退出程序
+                            CloseVerifyLayer();
+                            trayIcon.Visible = false;
+                            Application.Exit();
+                        }
+                        else
+                        {
+                            // 手写错误：关闭验证窗口，程序不退出，走系统通知
+                            CloseVerifyLayer();
+                            ShowBalloonTip("退出验证失败", "手写内容不正确，程序未退出");
+                        }
+                    }
+                    else if (type == "verifyCancel")
+                    {
+                        // 用户点击右上角关闭：取消退出
+                        CloseVerifyLayer();
+                        ShowBalloonTip("退出已取消", "程序将继续运行");
+                    }
+                }));
+            }
+            catch { }
+        }
+
+        private void CloseVerifyLayer()
+        {
+            verifyActive = false;
+            if (verifyWebView != null)
+            {
+                try { verifyWebView.WebMessageReceived -= HandleVerifyMessage; verifyWebView.Dispose(); } catch { }
+                verifyWebView = null;
+            }
+            if (verifyLayer != null)
+            {
+                try { verifyLayer.Hide(); verifyLayer.Dispose(); } catch { }
+                verifyLayer = null;
+            }
+        }
+        #endregion
         #region 性能模式开关
         private void TogglePerformanceMode(object sender, EventArgs e)
         {
@@ -770,6 +1007,8 @@ namespace _01
 
         private void CleanupResources()
         {
+            StopOpenVideoSignalListener();
+
             topMostTimer?.Stop();
             topMostTimer?.Dispose();
             focusCheckTimer?.Stop();
@@ -1444,8 +1683,7 @@ namespace _01
                 if (direction == "hide")
                 {
                     btnForm.Show();
-                    btnToggle.Image = Image.FromFile(imgExpand);
-                    SetButtonRegion(btnForm, (Bitmap)btnToggle.Image);
+                    SetLayeredButtonImage(btnForm, imgExpand);
                 }
             }
         }
@@ -1482,6 +1720,17 @@ namespace _01
                 try { animationLayer.Hide(); animationLayer.Dispose(); } catch { }
                 animationLayer = null;
             }
+            if (verifyWebView != null)
+            {
+                try { verifyWebView.Dispose(); } catch { }
+                verifyWebView = null;
+            }
+            if (verifyLayer != null)
+            {
+                try { verifyLayer.Hide(); verifyLayer.Dispose(); } catch { }
+                verifyLayer = null;
+            }
+            verifyActive = false;
             animationReady = false;
         }
         #endregion
@@ -1754,7 +2003,79 @@ namespace _01
         #endregion
 
 
-        #region PNG转Region 镂空
+        #region PNG逐像素透明与Region命中
+        private static void EnableLayeredWindow(Form form)
+        {
+            IntPtr hWnd = form.Handle;
+            int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+            SetWindowLong(hWnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
+        }
+
+        private static void SetLayeredButtonImage(Form form, string imagePath)
+        {
+            using Bitmap source = new Bitmap(imagePath);
+            SetLayeredButtonImage(form, source);
+        }
+
+        private static void SetLayeredButtonImage(Form form, Bitmap source)
+        {
+            if (source == null) return;
+
+            EnableLayeredWindow(form);
+            SetButtonRegion(form, source);
+
+            int width = source.Width;
+            int height = source.Height;
+            form.Size = new Size(width, height);
+
+            using Bitmap render = new Bitmap(width, height, PixelFormat.Format32bppPArgb);
+            using (Graphics graphics = Graphics.FromImage(render))
+            {
+                graphics.Clear(Color.Transparent);
+                graphics.DrawImage(source, 0, 0, width, height);
+            }
+
+            IntPtr screenDc = GetDC(IntPtr.Zero);
+            IntPtr memoryDc = CreateCompatibleDC(screenDc);
+            IntPtr bitmap = render.GetHbitmap(Color.FromArgb(0));
+            IntPtr oldBitmap = SelectObject(memoryDc, bitmap);
+
+            try
+            {
+                POINT windowPosition = new POINT { X = form.Left, Y = form.Top };
+                SIZE windowSize = new SIZE { cx = width, cy = height };
+                POINT sourcePosition = new POINT { X = 0, Y = 0 };
+                BLENDFUNCTION blend = new BLENDFUNCTION
+                {
+                    BlendOp = AC_SRC_OVER,
+                    BlendFlags = 0,
+                    SourceConstantAlpha = 255,
+                    AlphaFormat = AC_SRC_ALPHA
+                };
+
+                if (!UpdateLayeredWindow(
+                    form.Handle,
+                    IntPtr.Zero,
+                    ref windowPosition,
+                    ref windowSize,
+                    memoryDc,
+                    ref sourcePosition,
+                    0,
+                    ref blend,
+                    ULW_ALPHA))
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+            }
+            finally
+            {
+                SelectObject(memoryDc, oldBitmap);
+                DeleteObject(bitmap);
+                DeleteDC(memoryDc);
+                ReleaseDC(IntPtr.Zero, screenDc);
+            }
+        }
+
         private static void SetButtonRegion(Form form, Bitmap bmp)
         {
             if (bmp == null) return;
@@ -1828,6 +2149,49 @@ namespace _01
             public int X;
             public int Y;
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SIZE
+        {
+            public int cx;
+            public int cy;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct BLENDFUNCTION
+        {
+            public byte BlendOp;
+            public byte BlendFlags;
+            public byte SourceConstantAlpha;
+            public byte AlphaFormat;
+        }
+
+        private const byte AC_SRC_OVER = 0;
+        private const byte AC_SRC_ALPHA = 1;
+        private const uint ULW_ALPHA = 0x00000002;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool UpdateLayeredWindow(IntPtr hWnd, IntPtr hdcDst,
+            ref POINT pptDst, ref SIZE psize, IntPtr hdcSrc,
+            ref POINT pptSrc, uint crKey, ref BLENDFUNCTION pblend, uint dwFlags);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetDC(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr CreateCompatibleDC(IntPtr hDC);
+
+        [DllImport("gdi32.dll")]
+        private static extern bool DeleteDC(IntPtr hDC);
+
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr SelectObject(IntPtr hDC, IntPtr hObject);
+
+        [DllImport("gdi32.dll")]
+        private static extern bool DeleteObject(IntPtr hObject);
 
         private const int WS_EX_NOACTIVATE = 0x08000000;
 

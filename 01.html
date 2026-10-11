@@ -10,14 +10,21 @@
 <base target="_blank">
 </head>
 <body class="text-gray-200 select-none">
+    <div id="webviewErrorScreen">
+        <img id="webviewErrorImg" src="err.png" alt="webview not available" draggable="false">
+    </div>
     <div id="video-bg-wrap"><video id="video-background" autoplay playsinline muted></video>
         <img id="album-photo-view" alt="" draggable="false">
     </div>
     <div id="canvas-container" class="cursor-pen w-full h-full fixed inset-0">
         <img id="watermark" src="水印.png" alt="" draggable="false">
     </div>
+    <div id="doublePageOverlay" class="double-page-overlay">
+        <div class="double-page-divider"></div>
+    </div>
     <canvas id="mega-eraser-preview"></canvas>
     <canvas id="grid-canvas"></canvas>
+    <div id="scrollIndicator"><div id="scrollIndicatorThumb"></div></div>
     <button id="btn-hide" onclick="hideWebLayer()"
             style="position: fixed; bottom: 42px; left: -20px; z-index: 1000; width: 80px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 30px; background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); border: 2px solid rgba(255,255,255,0.25); color: rgba(255,255,255,0.9); cursor: pointer;">
            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -37,9 +44,15 @@
             </svg>
         </button>
     </div>
+    <div id="doublePageMenu" class="double-page-menu">
+        <div class="double-page-menu-header">页面设置</div>
+        <div class="double-page-toggle" onclick="toggleDoublePage()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
+            <span class="double-page-toggle-label">双页书写</span>
+            <div class="double-page-switch" id="doublePageSwitch"></div>
+        </div>
+    </div>
     <div class="toolbar" id="toolbar">
         <div class="tool-highlight" id="toolHighlight" aria-hidden="true"></div>
-        <!-- 【新增鼠标按钮 最前面】 -->
         <div style="position: relative;">
             <button id="tool-mouse" class="tool-btn" onclick="handleMouseClick()" ontouchstart="handleMouseTouch(event)">
                 <img id="img-mouse" src="icon/鼠标.png" alt="鼠标">
@@ -72,7 +85,6 @@
                         </button>
                     </div>
                 </div>
-                <!-- 自动校正开关 -->
                 <div class="grid-section">
                     <div class="grid-toggle" onclick="toggleAutoCorrection()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
                         <span class="grid-toggle-label">自动校正</span>
@@ -85,7 +97,6 @@
             <button id="tool-eraser" class="tool-btn" onclick="handleEraserClick()" ontouchstart="handleEraserTouch(event)">
                 <img id="img-eraser" src="icon/橡皮.png" alt="橡皮">
             </button>
-            <!-- 橡皮擦设置菜单：选中橡皮后再次点击显示 -->
             <div id="eraserMenu" class="eraser-menu" onclick="event.stopPropagation()">
                 <div class="slider-clear">
                     <div class="slider-clear-track" id="sliderClearTrack">
@@ -98,7 +109,6 @@
         <button id="btn-undo" class="tool-btn" onclick="undo()" ontouchstart="handleUndoTouch(event)">
             <img id="img-undo" src="icon/撤回.png" alt="撤回">
         </button>
-        <!-- 【已删除原来的清除按钮 btn‑clear】 -->
         <div style="position: relative;">
             <button id="btn-more" class="tool-btn" onclick="handleMoreClick(event)" ontouchstart="handleMoreTouch(event)">
                 <img id="img-more" src="icon/更多.png" alt="更多">
@@ -148,7 +158,6 @@
                     </button>
                 </div>
             </div>
-            <!-- 视频背景菜单（从更多菜单打开） -->
             <div id="videoMenu" class="video-menu" onclick="event.stopPropagation()">
                 <div class="video-menu-header">视频背景设置</div>
                 <div class="video-toggle" onclick="toggleVideoBackground()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
@@ -182,6 +191,9 @@
         </button>
     </div>
     <div id="cameraToolbar">
+        <button id="btn-exit-video" class="tool-btn" onclick="confirmExitVideoMode()" title="退出视频模式">
+            <img src="icon/退出.png" alt="退出视频">
+        </button>
         <button id="btn-capture" class="tool-btn" onclick="capturePhoto()">
             <img src="icon/拍照.png" alt="拍照">
         </button>
@@ -189,7 +201,6 @@
             <img src="icon/相册.png" alt="相册">
         </button>
     </div>
-    <div id="captureFlash"></div>
     <div id="albumPanel">
         <div class="album-panel-header">相册(本地存储)</div>
         <div class="album-list" id="albumList"></div>
@@ -206,6 +217,16 @@
                 <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
             |  关闭Timer
+        </button>
+    </div>
+    <div id="desmosOverlay" class="timer-overlay" style="display:none;">
+        <iframe id="desmosFrame" src="about:blank" title="函数绘图器" allow="autoplay"></iframe>
+        <button id="desmosCloseBtn" class="timer-close-btn" onclick="closeDesmos()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            <span>|  关闭函数绘图器</span>
         </button>
     </div>
     <div class="overlay" id="clearConfirmOverlay" onclick="handleClearOverlayClick(event)">
@@ -230,6 +251,28 @@
             <button class="btn-ok" onclick="confirmAddPage()"></button>
         </div>
     </div>
+    <div class="overlay" id="exitVideoConfirmOverlay" onclick="handleExitVideoOverlayClick(event)">
+        <div class="popup" id="exitVideoConfirmPopup">
+            <img src="popupwin.png" class="popup-bg" alt="popup background">
+            <button class="close-btn" onclick="closeExitVideoModal()"></button>
+            <div class="text-container">
+                <p>确认退出视频模式？<br>退出后摄像头将关闭，当前画面将被清空。</p>
+            </div>
+            <button class="btn-cancel" onclick="closeExitVideoModal()"></button>
+            <button class="btn-ok" onclick="executeExitVideo()"></button>
+        </div>
+    </div>
+    <div class="overlay" id="doublePageConfirmOverlay" onclick="handleDoublePageOverlayClick(event)">
+        <div class="popup" id="doublePageConfirmPopup">
+            <img src="popupwin.png" class="popup-bg" alt="popup background">
+            <button class="close-btn" onclick="closeDoublePageConfirm()"></button>
+            <div class="text-container">
+                <p>开关双页书写模式时必须清空全部页面</p>
+            </div>
+            <button class="btn-cancel" onclick="closeDoublePageConfirm()"></button>
+            <button class="btn-ok" onclick="confirmDoublePageToggle()"></button>
+        </div>
+    </div>
     <div id="resetAllConfirmBar" class="confirm-bar">
         <div class="confirm-modal">
             <div class="confirm-modal-top-bar"></div>
@@ -251,7 +294,6 @@
         </div>
         <img id="resultImage" class="result-image" src="" alt="抽奖结果">
     </div>
-    <!-- 关于对话框 - 新样式 -->
     <div id="aboutDialog" class="about-dialog" onclick="closeAboutOnOverlay(event)">
         <div class="confirm-modal">
             <div class="confirm-modal-top-bar"></div>
@@ -262,6 +304,7 @@
                 </div>
                 <div class="confirm-bar-buttons">
                     <button onclick="closeAbout()" class="confirm-btn confirm-btn-cancel">确定</button>
+                    <button onclick="openDesmos()" class="confirm-btn confirm-btn-desmos">函数绘图器</button>
                     <button onclick="confirmResetAll()" class="confirm-btn confirm-btn-confirm">重置黑板</button>
                 </div>
             </div>
@@ -286,3 +329,5 @@
 </body>
 </html>
 
+<!-- html文件中不要写任何注释 -->
+ 

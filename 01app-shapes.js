@@ -17,13 +17,11 @@ function updateAutoCorrectionSwitch() {
     }
 }
 
-// --- 图形绘制功能 ---
 function startShapeDraw(shapeType) {
     closeMoreMenu();
     state.shapeMode = shapeType;
     state.shapeStartPoint = null;
 
-    // 创建预览canvas
     if (!state.shapePreviewCanvas) {
         const canvas = document.createElement('canvas');
         canvas.id = 'shape-preview-canvas';
@@ -42,7 +40,7 @@ function startShapeDraw(shapeType) {
     const v = state.videoView || { scale: 1, tx: 0, ty: 0 };
     const r = state.videoRect || { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
     const a = dpr * (v.scale || 1);
-    const rect = getCanvasTargetRect(); // 预览层同样占满整个屏幕
+    const rect = getCanvasTargetRect();
     state.shapePreviewCanvas.width = Math.round(rect.width * dpr);
     state.shapePreviewCanvas.height = Math.round(rect.height * dpr);
     state.shapePreviewCanvas.style.width = rect.width + 'px';
@@ -53,7 +51,6 @@ function startShapeDraw(shapeType) {
     state.shapePreviewCtx.clearRect(0, 0, state.shapePreviewCanvas.width, state.shapePreviewCanvas.height);
     state.shapePreviewCtx.restore();
 
-    // 更改光标提示用户
     container.style.cursor = 'crosshair';
 }
 
@@ -66,7 +63,9 @@ function drawShapePreview(startX, startY, endX, endY) {
     ctx.clearRect(0, 0, state.shapePreviewCanvas.width, state.shapePreviewCanvas.height);
     ctx.restore();
 
-    // 对起点和终点进行吸附（预览时）
+    ctx.save();
+    if (state.doublePageMode) ctx.translate(doublePageOffsetX(state.activeDoublePage), 0);
+
     const startSnap = snapToCircle(startX, startY);
     if (startSnap.didSnap) {
         startX = startSnap.x;
@@ -89,7 +88,6 @@ function drawShapePreview(startX, startY, endX, endY) {
         ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
         ctx.stroke();
 
-        // 预览时显示圆心十字标记
         ctx.save();
         ctx.strokeStyle = penConfig.currentColor;
         ctx.lineWidth = Math.max(1.5, penConfig.currentSize * 0.5);
@@ -102,7 +100,6 @@ function drawShapePreview(startX, startY, endX, endY) {
         ctx.stroke();
         ctx.restore();
     } else if (state.shapeMode === 'line' || state.shapeMode === 'dashed') {
-        // 吸附逻辑：接近水平或垂直时自动吸附
         const dx = endX - startX;
         const dy = endY - startY;
         const angleRad = Math.atan2(dy, dx);
@@ -112,11 +109,10 @@ function drawShapePreview(startX, startY, endX, endY) {
         let finalEndX = endX;
         let finalEndY = endY;
 
-        // 如果接近水平（偏差<3度），吸附到水平
+        // 偏差 <3 度时吸附到水平/垂直
         if (adjustedAngle < 3) {
             finalEndY = startY;
         }
-        // 如果接近垂直（偏差<3度），吸附到垂直
         else if (adjustedAngle > 87) {
             finalEndX = startX;
         }
@@ -135,18 +131,18 @@ function drawShapePreview(startX, startY, endX, endY) {
             ctx.setLineDash([]);
         }
     }
+
+    ctx.restore();
 }
 
-// --- 吸附功能：将点吸附到圆心、圆上或直线端点 ---
+// 吸附到直线端点（优先级最高）、圆心或圆周
 function snapToCircle(x, y) {
-    const snapThreshold = 15; // 吸附阈值（像素）
+    const snapThreshold = 15;
     let snappedX = x;
     let snappedY = y;
     let didSnap = false;
 
-    // 首先检查直线端点吸附（优先级最高）
     for (const line of state.lines) {
-        // 检查起点
         const distToStart = Math.sqrt((x - line.x1) ** 2 + (y - line.y1) ** 2);
         if (distToStart < snapThreshold) {
             snappedX = line.x1;
@@ -155,7 +151,6 @@ function snapToCircle(x, y) {
             return { x: snappedX, y: snappedY, didSnap };
         }
 
-        // 检查终点
         const distToEnd = Math.sqrt((x - line.x2) ** 2 + (y - line.y2) ** 2);
         if (distToEnd < snapThreshold) {
             snappedX = line.x2;
@@ -166,12 +161,10 @@ function snapToCircle(x, y) {
     }
 
     for (const circle of state.circles) {
-        // 计算到圆心的距离
         const dx = x - circle.x;
         const dy = y - circle.y;
         const distToCenter = Math.sqrt(dx * dx + dy * dy);
 
-        // 检查是否接近圆心
         if (distToCenter < snapThreshold) {
             snappedX = circle.x;
             snappedY = circle.y;
@@ -179,10 +172,8 @@ function snapToCircle(x, y) {
             break;
         }
 
-        // 检查是否接近圆周（圆上）
         const distToCircle = Math.abs(distToCenter - circle.radius);
         if (distToCircle < snapThreshold) {
-            // 计算圆上的点（沿相同方向）
             const angle = Math.atan2(dy, dx);
             snappedX = circle.x + Math.cos(angle) * circle.radius;
             snappedY = circle.y + Math.sin(angle) * circle.radius;
@@ -200,21 +191,18 @@ function finishShapeDraw(endX, endY) {
     let startX = state.shapeStartPoint.x;
     let startY = state.shapeStartPoint.y;
 
-    // 对起点进行吸附
     const startSnap = snapToCircle(startX, startY);
     if (startSnap.didSnap) {
         startX = startSnap.x;
         startY = startSnap.y;
     }
 
-    // 对终点进行吸附
     const endSnap = snapToCircle(endX, endY);
     if (endSnap.didSnap) {
         endX = endSnap.x;
         endY = endSnap.y;
     }
 
-    // 用于存储最终的端点坐标（经过吸附后的坐标）
     let finalStartX = startX;
     let finalStartY = startY;
     let finalEndX = endX;
@@ -233,18 +221,15 @@ function finishShapeDraw(endX, endY) {
             width: penConfig.currentSize
         };
     } else if (state.shapeMode === 'line' || state.shapeMode === 'dashed') {
-        // 吸附逻辑：接近水平或垂直时自动吸附
         const dx = endX - startX;
         const dy = endY - startY;
         const angleRad = Math.atan2(dy, dx);
         const angleDeg = Math.abs(angleRad * 180 / Math.PI);
         const adjustedAngle = angleDeg > 90 ? 180 - angleDeg : angleDeg;
 
-        // 如果接近水平（偏差<3度），吸附到水平
         if (adjustedAngle < 3) {
             finalEndY = startY;
         }
-        // 如果接近垂直（偏差<3度），吸附到垂直
         else if (adjustedAngle > 87) {
             finalEndX = startX;
         }
@@ -261,12 +246,12 @@ function finishShapeDraw(endX, endY) {
     }
 
     if (stroke) {
+        if (typeof attachDoublePagePg === 'function') attachDoublePagePg(stroke);
         state.strokes.push(stroke);
         pushUndo({ type: 'add', stroke: stroke });
         renderAll();
     }
 
-    // 清除预览
     if (state.shapePreviewCanvas && state.shapePreviewCtx) {
         state.shapePreviewCtx.save();
         state.shapePreviewCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -274,13 +259,11 @@ function finishShapeDraw(endX, endY) {
         state.shapePreviewCtx.restore();
     }
 
-    // 重置状态
     state.shapeMode = null;
     state.shapeStartPoint = null;
     container.style.cursor = state.tool === 'pen' ? 'crosshair' : 'auto';
 }
 
-// --- 笔画几何分析工具 ---
 function isCloseToLine(points, threshold) {
     if (points.length < 2) return false;
 
@@ -369,8 +352,7 @@ function drawCircle(centerX, centerY, radius) {
     state.ctx.stroke();
 }
 
-// 分析一笔手绘点列：若符合直线/圆，则返回对应的矢量笔画描述；否则返回 null。
-// 该函数不再直接绘制画布，由调用方提交矢量笔画并 renderAll()。
+// 分析手绘点列：符合直线/圆则返回对应矢量描述，否则返回 null；不直接绘制，由调用方提交
 function analyzeAndConvertStroke(points) {
     if (!state.autoCorrectionEnabled) return null;
     if (points.length < 3) return null;
@@ -379,7 +361,6 @@ function analyzeAndConvertStroke(points) {
     const end = points[points.length - 1];
     const length = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
 
-    // 仅在笔画足够长时考虑直线替换
     if (length > 160) {
         const isLine = isCloseToLine(points, 15);
         if (isLine) {
@@ -396,7 +377,6 @@ function analyzeAndConvertStroke(points) {
     }
 
     const circle = fitCircle(points);
-    // 圆半径必须大于阈值才替换
     if (circle && circle.radius > 120) {
         const isCircle = isCloseToCircle(points, circle, 80);
         if (isCircle) {

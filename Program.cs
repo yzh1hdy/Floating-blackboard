@@ -1,7 +1,9 @@
-﻿using _01;
+using _01;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -18,11 +20,43 @@ static class Program
         // 创建唯一互斥锁（使用 GUID 保证全局唯一）
         bool isNew;
         _mtx = new Mutex(initiallyOwned: true,
-                         name: @"Global\MyFloatWebViewTimer_7E7E7E7E",
-                         createdNew: out isNew);
+                         @"Global\MyFloatWebViewTimer_7E7E7E7E",
+                         out isNew);
+
+        // 仅在本实例首次创建互斥锁时设置权限：授予所有用户/所有会话(Everyone)
+        // 完全访问权限。当程序由"计划任务"开机自启时，其运行会话/完整性级别可能与
+        // 用户随后手动启动的第二个实例不一致，默认 DACL 可能导致后者无法打开互斥锁
+        // 而误判为新实例。显式放宽 DACL 后，任何会话/完整性级别的进程都能可靠检测到已运行。
+        if (isNew)
+        {
+            var mutexSecurity = new MutexSecurity();
+            mutexSecurity.AddAccessRule(new MutexAccessRule(
+                new SecurityIdentifier(WellKnownSidType.WorldSid, null),
+                MutexRights.FullControl,
+                AccessControlType.Allow));
+            try { _mtx.SetAccessControl(mutexSecurity); } catch { }
+        }
 
         if (!isNew)
         {
+            // 检测命令行参数：若带 --video，通知已在运行的原进程立即打开 html 视频模式
+            try
+            {
+                foreach (var arg in Environment.GetCommandLineArgs())
+                {
+                    if (string.Equals(arg.Trim(), "--video", StringComparison.OrdinalIgnoreCase))
+                    {
+                        using (var openVideo = EventWaitHandle.OpenExisting(
+                            @"Global\MyFloatWebViewTimer_7E7E7E7E_OpenVideo"))
+                        {
+                            openVideo.Set();
+                        }
+                        break;
+                    }
+                }
+            }
+            catch { }
+
             // 已有实例在运行，使用系统托盘通知提示
             try
             {

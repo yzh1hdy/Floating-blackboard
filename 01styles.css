@@ -12,7 +12,6 @@ body {
     height: 100vh;
 }
 
-/* 顶部二进制显示栏（仅在抽奖结果界面显示） */
 .top-bar {
     position: relative;
     z-index: 3;
@@ -52,7 +51,6 @@ body {
 
 
 
-/* 透明背景模式 */
 body.transparent-mode {
     background-color: transparent !important;
 }
@@ -61,7 +59,6 @@ body.transparent-mode #canvas-container {
     background-color: transparent !important;
 }
 
-/* 透明模式下所有弹出菜单的背景调整为半透明 */
 body.transparent-mode .pen-menu,
 body.transparent-mode .more-menu,
 body.transparent-mode .video-menu,
@@ -72,13 +69,11 @@ body.transparent-mode .eraser-menu {
     -webkit-backdrop-filter: blur(25px) saturate(180%);
 }
 
-/* 透明模式下导航按钮完全透明背景（工具栏保持液态玻璃样式） */
 body.transparent-mode .fixed.bottom-3 {
     background: transparent !important;
     backdrop-filter: none;
 }
 
-/* 透明模式下按钮悬停效果 */
 body.transparent-mode .nav-btn:hover:not(:disabled) {
     background: rgba(255,255,255,0.08);
 }
@@ -88,12 +83,10 @@ body.transparent-mode .nav-btn:hover:not(:disabled) {
 .cursor-eraser-active {
     cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.8)" stroke-width="1.5" style="shape-rendering: geometricPrecision;"/></svg>') 20 20, auto;
 }
-/* 超大橡皮擦模式样式 - 粉色半透明 */
 .mega-eraser-active {
     cursor: none !important;
 }
 
-/* 超大橡皮擦预览层 */
 #mega-eraser-preview {
     position: absolute;
     top: 0;
@@ -133,7 +126,6 @@ body.transparent-mode .nav-btn:hover:not(:disabled) {
     border-color: rgba(255,255,255,0.3);
 }
 
-/* ========== 液态玻璃工具栏（参考液态玻璃工具栏.html样式） ========== */
 .toolbar {
     position: fixed;
     bottom: 14px;
@@ -145,15 +137,14 @@ body.transparent-mode .nav-btn:hover:not(:disabled) {
     gap: 6px;
     padding: 8px;
     border-radius: 34px;
-    /* 触屏关键：禁用浏览器手势（滚动/缩放），把触摸完全交给指针事件 */
+    /* 禁用浏览器手势（滚动/缩放），把触摸完全交给指针事件 */
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
 }
 
-/* 液态玻璃背景/模糊移到 ::before：工具栏本体不再携带 backdrop-filter 与 isolation，
-   从而不会成为 backdrop root，子菜单（.pen-menu 等）的 backdrop-filter 才能采样到页面，
-   与工具栏保持一致模糊效果。 */
+/* 背景/模糊放在 ::before 而非 .toolbar 本体：避免工具栏成为 backdrop root，
+   子菜单的 backdrop-filter 才能采样到页面，保持一致的模糊效果。 */
 .toolbar::before {
     content: '';
     position: absolute;
@@ -168,7 +159,6 @@ body.transparent-mode .nav-btn:hover:not(:disabled) {
     pointer-events: none;
 }
 
-/* 高亮滑块：液态玻璃的活动项指示器，位置由 JS rAF 动画驱动（参考液态玻璃工具栏.html） */
 .tool-highlight {
     position: absolute;
     left: 8px;
@@ -180,7 +170,7 @@ body.transparent-mode .nav-btn:hover:not(:disabled) {
     box-shadow: inset 0 1px rgba(255,255,255,0.32), 0 4px 15px rgba(0,0,0,0.16);
     opacity: 0;
     pointer-events: none;
-    /* 位置/形变逐帧由 rAF 更新，禁用 CSS transition 避免两者打架 */
+    /* 位置由 JS rAF 逐帧驱动，禁用 transition 避免冲突 */
     transition: none;
     will-change: left, top, width, height, transform;
 }
@@ -188,7 +178,6 @@ body.transparent-mode .nav-btn:hover:not(:disabled) {
 .tool-btn {
     position: relative;
     z-index: 1;
-    /* 宽一点的圆角矩形（不再是纯圆） */
     width: 72px;
     height: 50px;
     border: none;
@@ -199,36 +188,30 @@ body.transparent-mode .nav-btn:hover:not(:disabled) {
     display: flex;
     align-items: center;
     justify-content: center;
-    /* 移除按下缩小效果 */
     transition: background 0.2s ease;
     -webkit-tap-highlight-color: transparent;
 }
 
-/* 移除 tool-btn 的 active 缩小效果 */
 .tool-btn:active {
     transform: none;
 }
 
-/* 鼠标悬停不再显示半透明背景框、图片不再提亮/切换 */
 .tool-btn:hover {
     background: transparent;
 }
 
 .tool-btn:focus-visible {
-    outline: 2px solid rgba(255,255,255,0.4);
+    outline: 2px solid rgba(0, 0, 0, 0);
     outline-offset: -2px;
 }
 
 .tool-btn img {
-    width: 25px;/*图标大小*/
+    width: 25px;
     height: 25px;
     pointer-events: none;
     user-select: none;
     filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35));
 }
-
-/* 已移除选中工具的图片提亮（图片高亮全部去除），选中状态仅由滑块指示 */
-.tool-btn.tool-active img {}
 
 /* 窄屏适配：按钮与滑块等比缩小，保证工具栏不溢出 */
 @media (max-width: 560px) {
@@ -265,7 +248,6 @@ canvas {
 }
 .modal-content { animation: popIn 0.1s ease-out; }
 
-/* 修改后的抽奖结果界面样式 */
 .number-result {
     display: none;
     position: fixed;
@@ -280,12 +262,10 @@ canvas {
     margin: 0;
 }
 
-/* 透明模式下抽奖结果背景也调整为半透明 */
 body.transparent-mode .number-result {
     background: rgba(255, 255, 255, 0.2);
 }
 
-/* 抽奖结果图片：宽度占满屏幕，保持比例 */
 .result-image {
     width: auto;
     height: auto;
@@ -468,7 +448,6 @@ body.transparent-mode .number-result {
     border-radius: 50%;
 }
 
-/* 网格线开关样式 */
 .grid-section {
     margin-top: 16px;
     padding-top: 16px;
@@ -593,7 +572,6 @@ body.transparent-mode .number-result {
     flex: 1;
 }
 
-/* 非关于弹窗中保持原有定位 */
 .confirm-bar:not(#aboutDialog) .confirm-bar-text,
 #clearAllConfirm .confirm-bar-text,
 #clearCurrentConfirm .confirm-bar-text,
@@ -630,12 +608,16 @@ body.transparent-mode .number-result {
     color: #333333;
 }
 
+.confirm-btn-desmos {
+    background-color: #2f72dc;
+    color: #ffffff;
+}
+
 .confirm-btn-confirm {
     background-color: #ff4145;
     color: #ffffff;
 }
 
-/* 网格线层 */
 #grid-canvas {
     position: absolute;
     top: 0;
@@ -644,7 +626,6 @@ body.transparent-mode .number-result {
     z-index: 5;
 }
 
-/* 更多菜单样式 */
 .more-menu {
     display: none;
     position: absolute;
@@ -728,7 +709,6 @@ body.transparent-mode .number-result {
     color: #fff;
 }
 
-/* 关于对话框 - 使用清除弹窗样式但无顶部红色条 */
 .about-dialog {
     display: none;
     position: fixed;
@@ -790,7 +770,6 @@ body.transparent-mode .number-result {
     color: #333333;
 }
 
-/* 关于视频弹窗 */
 .video-overlay {
     display: none;
     position: fixed;
@@ -844,7 +823,6 @@ body.transparent-mode .number-result {
     background: rgba(255, 255, 255, 0.2);
 }
 
-/* 视频背景菜单样式 */
 .video-menu {
     display: none;
     position: absolute;
@@ -945,15 +923,14 @@ body.transparent-mode .number-result {
     font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
 }
 
-/* 透明模式或视频背景模式下：隐藏左下角隐藏按钮与右下角翻页 */
 body.transparent-mode #btn-hide,
 body.video-active #btn-hide,
+body.desmos-active #btn-hide,
 body.transparent-mode #pageNav,
 body.video-active #pageNav {
     display: none !important;
 }
 
-/* 摄像头选择器 */
 .camera-selector {
     margin-top: 10px;
 }
@@ -978,7 +955,6 @@ body.video-active #pageNav {
     color: #fff;
 }
 
-/* 视频背景菜单：旋转画面按钮 */
 .video-rotate-row {
     margin-top: 10px;
 }
@@ -1008,9 +984,6 @@ body.video-active #pageNav {
     cursor: default;
 }
 
-/* 视频背景元素 - 最底层。默认不裁切、保持原始比例（object-fit: contain）；
-   激活后尺寸/位置/旋转由 JS 按可见矩形动态设置。 */
-/* 视频背景容器 - 最底层。包裹层承载与画布同款的缩放/平移，使视频跟随画布移动。 */
 #video-bg-wrap {
     position: fixed;
     top: 0;
@@ -1025,7 +998,6 @@ body.video-active #pageNav {
 #video-bg-wrap.active {
     display: block;
 }
-/* 视频元素：在包裹层内居中，不裁切、保持原始比例；旋转由 JS 设置 */
 #video-background {
     position: absolute;
     top: 50%;
@@ -1041,8 +1013,6 @@ body.video-active #pageNav {
     display: block;
 }
 
-/* 抽学号特殊视频：独立占满结果层并保持视频比例，避免受顶部栏和图片布局影响 */
-/* 工具菜单与工具栏完全共用同一层液态玻璃材质；菜单置于工具栏下方 */
 .pen-menu,
 .more-menu,
 .eraser-menu,
@@ -1091,7 +1061,6 @@ body.video-active #pageNav {
     visibility: hidden;
 }
 
-/* Canvas容器 - 中间层 (z-index: 10) */
 #canvas-container {
     position: fixed;
     top: 0;
@@ -1101,16 +1070,13 @@ body.video-active #pageNav {
     z-index: 10;
     background-color: #0f261e;
     transition: background-color 0.3s ease;
-    /* 视频模式下鼠标工具拖动/缩放：把触摸完全交给 pointer 事件，禁用浏览器手势 */
     touch-action: none;
 }
 
-/* 视频激活时画布容器背景变透明 */
 body.video-active #canvas-container {
     background-color: transparent;
 }
 
-/* 主画布 - 透明背景 */
 #main-canvas {
     position: absolute;
     top: 0;
@@ -1119,8 +1085,6 @@ body.video-active #canvas-container {
     background-color: transparent;
 }
 
-/* 空白页水印：普通模式（非透明、非视频背景）且页面无任何内容时，居中显示。
-   50% 大小、95% 透明度；置于画布之下，笔迹绘制在其上方。默认隐藏，由 updateWatermark 控制显隐。 */
 #watermark {
     position: absolute;
     left: 50%;
@@ -1128,18 +1092,20 @@ body.video-active #canvas-container {
     transform: translate(-50%, -50%);
     width: 50%;
     height: auto;
-    opacity: 0.95;
+    opacity: 0;
+    visibility: hidden;
     pointer-events: none;
     user-select: none;
     z-index: 5;
-    display: none;
+    transition: opacity 0.6s ease, visibility 0s linear 0.6s;
 }
 
 #watermark.show {
-    display: block;
+    opacity: 0.95;
+    visibility: visible;
+    transition: opacity 0.6s ease;
 }
 
-/* 清空页面时，画布内容逐步模糊并渐隐 */
 #main-canvas.canvas-clear-animating {
     animation: canvasClearAnimation 520ms ease-out forwards;
 }
@@ -1171,7 +1137,6 @@ body.video-active #canvas-container {
     }
 }
 
-/* 网格画布 */
 #grid-canvas {
     position: absolute;
     top: 0;
@@ -1180,17 +1145,14 @@ body.video-active #canvas-container {
     z-index: 5;
 }
 
-/* 确保UI元素在顶层 */
 .toolbar, .fixed.bottom-3 {
     z-index: 100;
 }
 
-/* 版本号文字在透明模式下增加阴影提高可读性 */
 body.transparent-mode .fixed.bottom-3.left-4 {
     text-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
 
-/* ========== 新版弹窗样式（来自弹窗.html） ========== */
 .overlay {
     position: fixed;
     inset: 0;
@@ -1273,7 +1235,6 @@ body.transparent-mode .fixed.bottom-3.left-4 {
     pointer-events: none;
 }
 
-/* 关闭按钮: 62x58 右上角, 透明仅保留判定区 */
 .close-btn {
     position: absolute;
     top: 0;
@@ -1286,7 +1247,6 @@ body.transparent-mode .fixed.bottom-3.left-4 {
     z-index: 10;
 }
 
-/* 文本容器: 全宽, top 59px, bottom 125px */
 .text-container {
     position: absolute;
     left: 0;
@@ -1306,7 +1266,6 @@ body.transparent-mode .fixed.bottom-3.left-4 {
     overflow-y: auto;
 }
 
-/* 取消按钮: 37,340 -> 295,410, 透明仅保留判定区 */
 .btn-cancel {
     position: absolute;
     left: 37px;
@@ -1319,7 +1278,6 @@ body.transparent-mode .fixed.bottom-3.left-4 {
     z-index: 10;
 }
 
-/* 确认按钮: 309,340 -> 567,410, 透明仅保留判定区 */
 .btn-ok {
     position: absolute;
     left: 309px;
@@ -1335,12 +1293,10 @@ body.transparent-mode .fixed.bottom-3.left-4 {
     z-index: 100;
 }
 
-/* 版本号文字在透明模式下增加阴影提高可读性 */
 body.transparent-mode .fixed.bottom-3.left-4 {
     text-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
 
-/* ========== 橡皮擦设置菜单（再次点击橡皮擦时显示） ========== */
 .eraser-menu {
     display: none;
     position: absolute;
@@ -1384,7 +1340,6 @@ body.transparent-mode .eraser-menu {
     font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
 }
 
-/* 滑动清空组件 - 新版样式 */
 .slider-clear {
     user-select: none;
     -webkit-user-select: none;
@@ -1444,7 +1399,6 @@ body.transparent-mode .eraser-menu {
 }
 
 
-/* 抽奖特殊图片动画：从大到小 + 渐入 */
 @keyframes lotterySpecialImagePop {
     0% {
         opacity: 0;
@@ -1466,14 +1420,12 @@ body.transparent-mode .eraser-menu {
 .toolbar {
     z-index: 2147483647 !important;
 }
-/* 工具菜单置于工具栏之下（低于按钮的 z-index:1）：滑出时从工具栏后方升起，而非盖在工具栏之上 */
 .toolbar .pen-menu,
 .toolbar .more-menu,
 .toolbar .eraser-menu,
 .toolbar .video-menu {
     z-index: 0 !important;
 }
-/* 计时器内嵌层（更多菜单 → 计时器） */
 .timer-overlay {
     display: none;
     position: fixed;
@@ -1516,7 +1468,10 @@ body.transparent-mode .eraser-menu {
     color: #fff;
 }
 
-/* ========== 透明模式深色 UI：透明模式下工具栏与工具菜单自动切至深色*/
+body.timer-active .toolbar {
+    display: none !important;
+}
+
 body.transparent-mode .toolbar::before {
     background: rgba(30,30,36,0.65);
     border-color: rgba(255,255,255,0.28);
@@ -1534,13 +1489,11 @@ body.transparent-mode .eraser-menu {
     -webkit-backdrop-filter: blur(25px) saturate(140%) !important;
 }
 
-/* 深色工具栏上高亮滑块略微提亮，保证选中态清晰 */
 body.transparent-mode .tool-highlight {
     background: linear-gradient(145deg, rgba(255,255,255,0.34), rgba(255,255,255,0.14));
     box-shadow: inset 0 1px rgba(255,255,255,0.36), 0 4px 15px rgba(0,0,0,0.2);
 }
 
-/* 深色菜单下关闭按钮改用白色，避免不可见 */
 body.transparent-mode .pen-menu-close {
     color: rgba(255,255,255,0.7);
 }
@@ -1550,7 +1503,6 @@ body.transparent-mode .pen-menu-close:hover {
 }
 
 
-/* ========== 视频模式深色 UI：工具栏与工具菜单与透明模式一致切换至深色 ========== */
 body.video-active .toolbar::before {
     background: rgba(30,30,36,0.65);
     border-color: rgba(255,255,255,0.28);
@@ -1581,9 +1533,112 @@ body.video-active .pen-menu-close:hover {
     background: rgba(255,255,255,0.15);
 }
 
-/* ============================================================
-   视频模式：左侧短工具栏（拍照 / 相册）
-   ============================================================ */
+body.desmos-active .toolbar::before {
+    background: rgba(30,30,36,0.65);
+    border-color: rgba(255,255,255,0.28);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.14), inset 0 -1px 1px rgba(255,255,255,0.05);
+}
+
+body.desmos-active .pen-menu,
+body.desmos-active .more-menu,
+body.desmos-active .video-menu,
+body.desmos-active .eraser-menu {
+    background: rgba(30,30,36,0.75) !important;
+    border: 1px solid rgba(255,255,255,0.28) !important;
+    box-shadow: 0 14px 36px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.14), inset 0 -1px 1px rgba(255,255,255,0.05) !important;
+    backdrop-filter: blur(25px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(25px) saturate(140%) !important;
+}
+
+body.desmos-active .tool-highlight {
+    background: linear-gradient(145deg, rgba(255,255,255,0.34), rgba(255,255,255,0.14));
+    box-shadow: inset 0 1px rgba(255,255,255,0.36), 0 4px 15px rgba(0,0,0,0.2);
+}
+
+body.desmos-active .pen-menu-close {
+    color: rgba(255,255,255,0.7);
+}
+body.desmos-active .pen-menu-close:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.15);
+}
+
+/* 函数绘图器网页置于画布之下、画布透明：在网页上方批注 */
+#desmosOverlay {
+    background: transparent;
+    z-index: 4;
+}
+body.desmos-active #canvas-container {
+    background-color: transparent;
+}
+body.desmos-active #watermark.show {
+    display: none;
+}
+/* 函数绘图器打开时工具栏不再隐藏，改为屏幕右侧垂直显示；
+   宽度取原高度、高度取原宽度（由 JS 按水平布局实测写入 --desmos-w/--desmos-h） */
+body.desmos-active .toolbar {
+    display: flex !important;
+    flex-direction: column;
+    left: auto;
+    right: 14px;
+    bottom: auto;
+    top: 50%;
+    transform: translateY(-50%);
+    width: var(--desmos-w, 66px);
+    height: var(--desmos-h, 478px);
+    align-items: center;
+}
+/* 竖直工具栏内：所有子项等分铺满；按钮高度用 --desmos-btn-h（JS 按槽位计算），保证滑块形状一致 */
+body.desmos-active .toolbar > * {
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+body.desmos-active .toolbar .tool-btn {
+    width: 100%;
+    height: var(--desmos-btn-h, 60px);
+}
+/* 垂直工具栏下，弹出菜单改为从按钮左侧展开，避免超出屏幕 */
+body.desmos-active .toolbar .pen-menu,
+body.desmos-active .toolbar .more-menu,
+body.desmos-active .toolbar .eraser-menu,
+body.desmos-active .toolbar .video-menu {
+    bottom: auto;
+    top: 0;
+    left: auto;
+    right: calc(100% + 12px);
+    transform: translateX(0);
+    animation-name: desmosMenuFloatIn;
+}
+body.desmos-active .toolbar .pen-menu.fade-out,
+body.desmos-active .toolbar .more-menu.fade-out,
+body.desmos-active .toolbar .eraser-menu.fade-out,
+body.desmos-active .toolbar .video-menu.fade-out {
+    animation-name: desmosMenuFloatOut;
+}
+@keyframes desmosMenuFloatIn {
+    from { transform: translateX(24px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+@keyframes desmosMenuFloatOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(24px); opacity: 0; }
+}
+
+#desmosCloseBtn {
+    background: rgba(30,30,36,0.7);
+    border: 2px solid rgba(255,255,255,0.28);
+    color: #fff;
+}
+#desmosCloseBtn:hover {
+    background: rgba(30,30,36,0.9);
+    color: #fff;
+}
+
 #cameraToolbar {
     position: fixed;
     bottom: 14px;
@@ -1601,7 +1656,6 @@ body.video-active .pen-menu-close:hover {
 #cameraToolbar.show {
     display: flex;
 }
-/* 短工具栏背景：与主工具栏完全相同的液态玻璃材质 */
 #cameraToolbar::before {
     content: '';
     position: absolute;
@@ -1615,17 +1669,16 @@ body.video-active .pen-menu-close:hover {
     z-index: -1;
     pointer-events: none;
 }
-/* 视频模式下短工具栏与主工具栏一同切换为深色材质 */
 body.video-active #cameraToolbar::before {
     background: rgba(30,30,36,0.65);
     border-color: rgba(255,255,255,0.28);
     box-shadow: 0 14px 36px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.14), inset 0 -1px 1px rgba(255,255,255,0.05);
 }
-/* 短工具栏按钮直接复用主工具栏 .tool-btn / .tool-btn img 样式（纯图标、无文字） */
 
-/* ============================================================
-   视频模式：右侧相册列表面板
-   ============================================================ */
+#btn-exit-video img {
+    pointer-events: none;
+}
+
 #albumPanel {
     position: fixed;
     top: 0;
@@ -1636,9 +1689,9 @@ body.video-active #cameraToolbar::before {
     z-index: 9000;
     display: flex;
     flex-direction: column;
-    background: rgba(20,20,24,0.72);
+    background: rgba(0, 0, 0, 0);
     border-left: 1px solid rgba(255,255,255,0.18);
-    box-shadow: -14px 0 40px rgba(0,0,0,0.5);
+    box-shadow: -14px 0 40px rgba(0,0,0,0.2);
     backdrop-filter: blur(28px) saturate(160%);
     -webkit-backdrop-filter: blur(28px) saturate(160%);
     transform: translateX(100%);
@@ -1647,7 +1700,6 @@ body.video-active #cameraToolbar::before {
 #albumPanel.show {
     transform: translateX(0);
 }
-/* 面板收起（停在屏幕右侧外部）时移除阴影，避免阴影左缘漏进屏幕 */
 #albumPanel:not(.show) {
     box-shadow: none;
 }
@@ -1677,8 +1729,11 @@ body.video-active #cameraToolbar::before {
     background: rgba(255,255,255,0.2);
     border-radius: 3px;
 }
-/* 照片只有一两张时，列表项从底部开始显示（贴向底部按钮区）；
-   内容溢出可滚动时 auto 边距解析为 0，不影响正常滚动 */
+/* 入场动画期间，位移元素会临时撑大可滚动区域造成滚动条错位，统一裁掉临时溢出 */
+.album-list.enter-clipping {
+    overflow: hidden;
+}
+/* 照片只有少量时列表项贴向底部按钮区；溢出滚动时 auto 边距解析为 0 */
 .album-list .album-item:first-child {
     margin-top: auto;
 }
@@ -1692,10 +1747,7 @@ body.video-active #cameraToolbar::before {
     color: #fff;
     cursor: pointer;
     touch-action: manipulation;
-    transition: background 0.2s ease, border-color 0.2s ease;
-}
-.album-item:hover {
-    background: rgba(255,255,255,0.12);
+    transition: border-color 0.2s ease;
 }
 .album-item.selected {
     background: rgba(255,255,255,0.16);
@@ -1719,7 +1771,8 @@ body.video-active #cameraToolbar::before {
     pointer-events: none;
 }
 .album-empty {
-    margin-top: 40%;
+    margin-top: auto;
+    margin-bottom: 40%;
     color: rgba(255,255,255,0.45);
     font-size: 14px;
     text-align: center;
@@ -1732,7 +1785,6 @@ body.video-active #cameraToolbar::before {
     gap: 10px;
     border-top: 1px solid rgba(255,255,255,0.12);
 }
-/* 底部按钮：背景完全透明，仅留淡边框；大圆角，无悬停效果 */
 .album-bottom-btn {
     flex: 1;
     padding: 12px 8px;
@@ -1741,26 +1793,14 @@ body.video-active #cameraToolbar::before {
     font-size: 14px;
     cursor: pointer;
     touch-action: manipulation;
-    background: transparent;
-    border: 1px solid rgba(255,255,255,0.12);
-    box-shadow: none;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.18);
+    backdrop-filter: saturate(160%);
+    -webkit-backdrop-filter: saturate(160%);
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* ============================================================
-   视频模式：拍照快门遮罩（页面变暗一下）
-   ============================================================ */
-#captureFlash {
-    position: fixed;
-    inset: 0;
-    z-index: 2147483646; /* 高于相册面板、略低于工具栏，变暗时不遮挡工具栏 */
-    background: #000;
-    opacity: 0;
-    pointer-events: none;
-}
 
-/* ============================================================
-   视频模式：相册照片查看元素（替换视频画面）
-   ============================================================ */
 #album-photo-view {
     position: absolute;
     top: 50%;
@@ -1774,7 +1814,6 @@ body.video-active #cameraToolbar::before {
     display: block;
 }
 
-/* 窄屏适配：短工具栏按钮复用 .tool-btn 的窄屏缩小规则，此处仅调整容器与相册 */
 @media (max-width: 560px) {
     #cameraToolbar {
         gap: 4px;
@@ -1787,4 +1826,151 @@ body.video-active #cameraToolbar::before {
         height: 130px;
     }
 }
+
+.cursor-grab-pan { cursor: grab; }
+.cursor-grabbing-pan { cursor: grabbing !important; }
+
+#scrollIndicator {
+    position: fixed;
+    right: 8px;
+    top: 16%;
+    height: 60%;
+    width: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.12);
+    z-index: 50;
+    display: none;
+    pointer-events: none;
+}
+#scrollIndicator.show {
+    display: block;
+}
+#scrollIndicatorThumb {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.55);
+}
+#webviewErrorScreen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999 !important; 
+    background: #00000000;
+    align-items: center;
+    justify-content: center;
+}
+#webviewErrorScreen.show {
+    display: flex;
+}
+#webviewErrorImg {
+    width: 100vw;
+    height: 100vh;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+    z-index: 21476 !important;
+}
+
+/* 双页书写模式：画布被竖线分为左右两页 */
+.double-page-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 25;
+    display: none;
+}
+.double-page-overlay.active {
+    display: block;
+}
+.double-page-divider {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: rgba(255,255,255,0.30);
+    box-shadow: 0 0 8px rgba(0,0,0,0.3);
+}
+
+/* 点击页码弹出的“双页书写”开关菜单 */
+.double-page-menu {
+    display: none;
+    position: fixed;
+    bottom: 80px;
+    right: 14px;
+    background: rgba(30,30,36,0.75);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.56), inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -1px 1px rgba(255,255,255,0.06);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 18px;
+    padding: 14px 16px;
+    z-index: 2147483646;
+    min-width: 180px;
+}
+.double-page-menu.show {
+    display: block;
+}
+.double-page-menu-header {
+    color: #fff;
+    font-size: 14px;
+    margin-bottom: 10px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    padding-bottom: 8px;
+}
+.double-page-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+}
+.double-page-toggle:hover {
+    background: rgba(255,255,255,0.14);
+}
+.double-page-toggle-label {
+    color: #fff;
+    font-size: 13px;
+    font-family: 'HarmonyOS Sans SC Medium', 'HarmonyOSSansSCMedium', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+}
+.double-page-switch {
+    width: 44px;
+    height: 24px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 12px;
+    position: relative;
+    transition: all 0.3s;
+}
+.double-page-switch.active {
+    background: #ffc0cb;
+}
+.double-page-switch::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: all 0.3s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+.double-page-switch.active::after {
+    left: 22px;
+}
+#pageIndicator {
+    cursor: pointer;
+    /* 页码文本较长时允许自适应宽度，保持单行显示；
+       导航容器右侧固定，宽度增大时整体向左扩展，上一页按钮随之左移 */
+    white-space: nowrap;
+    width: auto;
+    min-width: 3rem;
+}
+/* 任何元素不要添加鼠标悬停效果！ */
 /* （注：内容由AI生成） */
