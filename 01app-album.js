@@ -123,7 +123,20 @@
         return item;
     }
 
-    function renderAlbumList(animate) {
+    // 只刷新选中高亮，不重建列表、不滚动。用于点击照片 / 切回相机等场景，
+    // 避免列表位置被强制翻到底部。
+    function updateAlbumSelection() {
+        const current = state.albumViewing ? photoView.getAttribute('src') : null;
+        albumListEl.querySelectorAll('.album-item').forEach(function (el) {
+            const selected = !!current && !!el.dataset.name && photos.some(function (p) {
+                return p.name === el.dataset.name && getPhotoFullUrl(p) === current;
+            });
+            el.classList.toggle('selected', selected);
+        });
+    }
+
+    // scrollToBottom 为 true 时才滚动到底部；新增照片等场景传 false 以保持当前位置。
+    function renderAlbumList(animate, scrollToBottom) {
         const previousTops = new Map();
         albumListEl.querySelectorAll('.album-item').forEach(function (el) {
             previousTops.set(el.dataset.name, el.getBoundingClientRect().top);
@@ -156,7 +169,7 @@
         });
 
         if (!animate) {
-            scrollListToBottom();
+            if (scrollToBottom) scrollListToBottom();
             return;
         }
 
@@ -168,13 +181,13 @@
 
         // 入场动画期间，列表项的 translateY 位移会临时撑大可滚动区域，
         // 导致右侧滚动条指示错位（长列表同样受影响）。动画期间统一裁掉
-        // 临时溢出，动画结束后恢复滚动并重新贴底，保证滑块位置正确。
+        // 临时溢出，动画结束后恢复滚动；仅需要贴底时才在动画前后贴底。
         clearTimeout(enterClipTimer);
         albumListEl.classList.add('enter-clipping');
-        scrollListToBottom();
+        if (scrollToBottom) scrollListToBottom();
         enterClipTimer = setTimeout(function () {
             albumListEl.classList.remove('enter-clipping');
-            scrollListToBottom();
+            if (scrollToBottom) scrollListToBottom();
         }, animationOptions.duration + 20);
 
         albumListEl.querySelectorAll('.album-item').forEach(function (el) {
@@ -206,7 +219,7 @@
         panelOpen = true;
         albumPanel.classList.add('show');
         requestPhotoList();
-        renderAlbumList(false);
+        renderAlbumList(false, true);
     }
     function closeAlbumPanel() {
         panelOpen = false;
@@ -254,7 +267,7 @@
         videoBackground.style.visibility = 'hidden';
         resetCanvasNow();
         if (typeof syncVideoLayout === 'function') syncVideoLayout();
-        renderAlbumList(false);
+        updateAlbumSelection();
     }
 
     function returnToCamera() {
@@ -265,7 +278,7 @@
         videoBackground.style.visibility = '';
         if (typeof syncVideoLayout === 'function') syncVideoLayout();
         resetCanvasNow();
-        renderAlbumList(false);
+        updateAlbumSelection();
         // 切回视频的同时自动关闭相册窗口
         closeAlbumPanel();
     }
@@ -300,7 +313,8 @@
             const savedPhoto = waitingForSaveResult;
             photos = Array.isArray(msg.photos) ? msg.photos : [];
             waitingForSaveResult = false;
-            renderAlbumList(animateAddition);
+            // 收到列表更新后统一滚动到底部：新照片始终显示在列表最下方。
+            renderAlbumList(animateAddition, true);
 
             // 每次拍照保存成功后自动打开相册；已经打开时不重复操作。
             if (savedPhoto && photos.length > 0 && !panelOpen) {
@@ -341,5 +355,5 @@
         positionCameraToolbar();
     });
 })();
-//（注：内容由AI生成）
+
 
