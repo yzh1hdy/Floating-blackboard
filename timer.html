@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>镂空时钟</title>
+    <style>
+        @font-face {
+            font-family: '小米兰亭pro';
+            src: url('小米兰亭pro特粗版.ttf') format('truetype');
+            font-weight: 900;
+            font-style: normal;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .clock-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        /* 底层图片 - 占满全屏 */
+        .bg-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+        }
+        /* 半透明黑色遮罩 - 添加模糊效果 */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(22px);
+            -webkit-backdrop-filter: blur(22px);
+            z-index: 2;
+        }
+        /* 倒计时结束后闪烁动画 */
+        @keyframes flash-overlay {
+            0% { background: rgba(0, 0, 0, 0.8); }
+            50% { background: rgba(255, 255, 255, 0.8); }
+            100% { background: rgba(0, 0, 0, 0.8); }
+        }
+        .overlay.flashing {
+            animation: flash-overlay 1s infinite ease-in-out;
+        }
+        /* 镂空时间文本 - 使用 background-clip: text */
+        .time-text {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 3;
+            font-size: 15vw;
+            font-family: '小米兰亭pro', 'Arial Black', sans-serif;
+            letter-spacing: 0.05em;
+            font-weight: 900;
+            background-image: url('Sparxie.png');
+            background-size: cover;
+            background-position: center;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            -webkit-text-stroke: 3px rgba(255, 255, 255, 0.9);
+            text-shadow:
+                0 0 20px rgba(255, 255, 255, 0.3),
+                0 0 40px rgba(255, 255, 255, 0.15);
+        }
+        /* 底部镂空按钮 */
+        .timer-btn {
+            padding: 14px 36px;
+            font-size: 26px;
+            font-family: '小米兰亭pro', 'Arial Black', sans-serif;
+            border-radius: 80px;
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            letter-spacing: 0.06em;
+            min-width: 120px;
+            position: absolute;
+            bottom: 24%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background-image: url('Sparxie.png');
+            background-size: cover;
+            background-position: center;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.9);
+            text-shadow:
+                0 0 20px rgba(255, 255, 255, 0.3),
+                0 0 40px rgba(255, 255, 255, 0.15);
+        }
+        .timer-btn:active {
+            transform: translateX(-50%) scale(0.96);
+        }
+        /* 主弹窗遮罩 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .modal-overlay.show {
+            display: flex;
+            opacity: 1;
+        }
+        .modal-content {
+            background: rgba(20, 20, 20, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 24px;
+            padding: 50px 45px;
+            text-align: center;
+            min-width: 420px;
+            box-shadow:
+                0 25px 80px rgba(0, 0, 0, 0.6),
+                0 0 0 1px rgba(255, 255, 255, 0.05);
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .modal-overlay.show .modal-content {
+            transform: scale(1) translateY(0);
+        }
+        .modal-title {
+            font-family: '小米兰亭pro', 'Arial Black', sans-serif;
+            font-size: 26px;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 35px;
+            letter-spacing: 0.08em;
+        }
+        .time-inputs {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+        .time-input-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .time-input-group label {
+            font-family: '小米兰亭pro', 'Arial Black', sans-serif;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.5);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            position: absolute;
+            top: -22px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+        }
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .input-wrapper input {
+            width: 90px;
+            height: 70px;
+            font-size: 36px;
+            font-family: '小米兰亭pro', 'Arial Black', sans-serif;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.06);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            color: rgba(255, 255, 255, 0.9);
+            outline: none;
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+        .input-wrapper .click-cover {
+            position:absolute;top:0;left:0;right:0;bottom:0;cursor:pointer;
+        }
+        .input-wrapper input:focus {
+            border-color: rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+        .input-wrapper input::-webkit-outer-spin-button,
+        .input-wrapper input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .input-wrapper input[type=number] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+        .adjust-btns-vertical {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .adjust-btn {
+            width: 36px;
+            height: 32px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 16px;
+            font-family: '小米兰亭pro', 'Arial Black', sans-serif;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .adjust-btn:hover {
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.5);
+            color: rgba(255, 255, 255, 0.95);
+        }
+        .adjust-btn:active {
+            transform: scale(0.9);
+            background: rgba(255, 255, 255, 0.25);
+        }
+        .time-separator {
+            font-size: 36px;
+            font-family: '小米兰亭pro', 'Arial Black', sans-serif;
+            color: rgba(255, 255, 255, 0.35);
+            padding-bottom: 0;
+            font-weight: 300;
+            align-self: center;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 18px;
+            justify-content: center;
+        }
+        .modal-btn {
+            padding: 14px 36px;
+            font-size: 16px;
+            font-family: '小米兰亭pro', 'Arial Black', sans-serif;
+            border-radius: 30px;
+            cursor: pointer;
+            border: 2px solid;
+            transition: all 0.3s ease;
+            letter-spacing: 0.06em;
+            min-width: 120px;
+        }
+        .modal-btn.confirm {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.4);
+            color: rgba(255, 255, 255, 0.95);
+        }
+        .modal-btn.confirm:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.8);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 255, 255, 0.1);
+        }
+        .modal-btn.cancel {
+            background: transparent;
+            border-color: rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.5);
+        }
+        .modal-btn.cancel:hover {
+            border-color: rgba(255, 255, 255, 0.5);
+            color: rgba(255, 255, 255, 0.85);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .modal-btn:active {
+            transform: scale(0.96);
+        }
+
+        /*=====数字选择弹窗（触屏）=====*/
+        .num-picker-overlay{
+            position:fixed;
+            top:0;left:0;right:0;bottom:0;
+            background:rgba(0,0,0,0.7);
+            z-index:200;
+            display:none;
+            justify-content:center;
+            align-items:center;
+            backdrop-filter:blur(6px);
+        }
+        .num-picker-overlay.show{
+            display:flex;
+        }
+        .num-picker{
+            background:rgba(22,22,22,0.92);
+            border:1px solid rgba(255,255,255,0.18);
+            border-radius:20px;
+            padding:24px;
+            max-width:440px;
+            width:92vw;
+        }
+        .num-picker-title{
+            text-align:center;
+            color:rgba(255,255,255,0.9);
+            font-size:20px;
+            margin-bottom:18px;
+            font-family:'小米兰亭pro',sans-serif;
+        }
+        .num-grid{
+            display:grid;
+            grid-template-columns:repeat(7,1fr);
+            gap:10px;
+        }
+        .num-btn{
+            height:52px;
+            font-size:20px;
+            font-family:'小米兰亭pro',sans-serif;
+            border-radius:12px;
+            border:1px solid rgba(255,255,255,0.22);
+            background:rgba(255,255,255,0.08);
+            color:rgba(255,255,255,0.92);
+            cursor:pointer;
+        }
+        .num-btn:active{
+            background:rgba(255,255,255,0.25);
+            transform:scale(0.94);
+        }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <!-- 提示音频 -->
+    <audio id="alertAudio" src="新世界pro.mp3" loop></audio>
+
+    <div class="clock-container">
+        <img src="Sparxie.png" alt="背景" class="bg-image">
+        <div class="overlay" id="overlay"></div>
+        <div class="time-text" id="clock">00:00</div>
+        <button class="timer-btn" id="timerBtn" onclick="handleTimerBtn()">计时器</button>
+    </div>
+
+    <!--主计时设置弹窗-->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-content">
+            <div class="modal-title">设置计时</div>
+            <div class="time-inputs">
+                <div class="adjust-btns-vertical">
+                    <button class="adjust-btn" onclick="adjustMin(1)">▲</button>
+                    <button class="adjust-btn" onclick="adjustMin(-1)">▼</button>
+                </div>
+                <div class="time-input-group">
+                    <div class="input-wrapper">
+                        <label>分钟</label>
+                        <input type="number" id="minInput" min="0" max="150" value="1">
+                        <div class="click-cover" onclick="openNumPicker('min')"></div>
+                    </div>
+                </div>
+                <div class="time-separator">:</div>
+                <div class="time-input-group">
+                    <div class="input-wrapper">
+                        <label>秒</label>
+                        <input type="number" id="secInput" min="0" max="60" value="0">
+                        <div class="click-cover" onclick="openNumPicker('sec')"></div>
+                    </div>
+                </div>
+                <div class="adjust-btns-vertical">
+                    <button class="adjust-btn" onclick="adjustSec(1)">▲</button>
+                    <button class="adjust-btn" onclick="adjustSec(-1)">▼</button>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="closeModal()">取消</button>
+                <button class="modal-btn confirm" onclick="startTimer()">开始</button>
+            </div>
+        </div>
+    </div>
+
+    <!--数字按钮选择弹窗 触屏专用-->
+    <div class="num-picker-overlay" id="numPickerOverlay">
+        <div class="num-picker">
+            <div class="num-picker-title" id="pickerTitle">选择数值</div>
+            <div class="num-grid" id="numGrid"></div>
+        </div>
+    </div>
+
+    <script>
+        let timerTimeout = null;
+        let endTime = null;
+        let isFlashing = false;
+        let isTimerRunning = false;
+        let isNormalClock = true;
+        let pickerTarget = null; // 'min' or 'sec'
+
+        function updateClock() {
+            if (!isNormalClock) return;
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('clock').textContent = hours + ':' + minutes;
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        function handleTimerBtn() {
+            if (isFlashing) {
+                stopFlashing();
+            } else if (isTimerRunning) {
+                stopTimer();
+            } else {
+                openModal();
+            }
+        }
+        function openModal() {
+            document.getElementById('modalOverlay').classList.add('show');
+        }
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('show');
+        }
+
+        //=====触屏数字选择弹窗逻辑=====
+        const MIN_OPTIONS = [1,2,3,4,5,6,7,8,9,10,12,15,18,20,30,40,60,90,120,150];
+        function openNumPicker(target){
+            pickerTarget = target;
+            const titleEl = document.getElementById('pickerTitle');
+            titleEl.textContent = target==='min' ? '选择分钟' : '选择秒(0‑60)';
+            const grid = document.getElementById('numGrid');
+            grid.innerHTML = '';
+            const options = target==='min' ? MIN_OPTIONS : Array.from({length:61},(_,i)=>i);
+            for(const i of options){
+                const btn = document.createElement('button');
+                btn.className = 'num-btn';
+                btn.textContent = i;
+                btn.onclick = ()=>{
+                    if(pickerTarget==='min') document.getElementById('minInput').value = i;
+                    if(pickerTarget==='sec') document.getElementById('secInput').value = i;
+                    closeNumPicker();
+                };
+                grid.appendChild(btn);
+            }
+            document.getElementById('numPickerOverlay').classList.add('show');
+        }
+        function closeNumPicker(){
+            document.getElementById('numPickerOverlay').classList.remove('show');
+        }
+        //点击遮罩关闭数字弹窗
+        document.getElementById('numPickerOverlay').addEventListener('click',e=>{
+            if(e.target.id === 'numPickerOverlay') closeNumPicker();
+        });
+
+        //上下调节
+        function adjustMin(delta) {
+            const input = document.getElementById('minInput');
+            let val = parseInt(input.value) || 0;
+            val += delta;
+            if (val < 0) val = 0;
+            if (val > 150) val = 150;
+            input.value = val;
+        }
+        function adjustSec(delta) {
+            const input = document.getElementById('secInput');
+            let val = parseInt(input.value) || 0;
+            val += delta;
+            if (val < 0) val = 0;
+            if (val > 60) val = 60;
+            input.value = val;
+        }
+
+        document.getElementById('modalOverlay').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        function startTimer() {
+            const min = parseInt(document.getElementById('minInput').value) || 0;
+            const sec = parseInt(document.getElementById('secInput').value) || 0;
+            const totalMs = (min * 60 + sec) * 1000;
+            if (totalMs <= 0) {
+                const modalContent = document.querySelector('.modal-content');
+                modalContent.style.transform = 'scale(1) translateX(-10px)';
+                setTimeout(() => modalContent.style.transform = 'scale(1) translateX(10px)', 50);
+                setTimeout(() => modalContent.style.transform = 'scale(1) translateX(-5px)', 100);
+                setTimeout(() => modalContent.style.transform = 'scale(1) translateX(5px)', 150);
+                setTimeout(() => modalContent.style.transform = 'scale(1) translateX(0)', 200);
+                return;
+            }
+            closeModal();
+            if (timerTimeout) { clearTimeout(timerTimeout); timerTimeout = null; }
+            stopFlashing();
+            endTime = Date.now() + totalMs;
+            isTimerRunning = true;
+            isNormalClock = false;
+            document.getElementById('timerBtn').textContent = '结束计时';
+            updateCountdown();
+        }
+        function stopTimer() {
+            if (timerTimeout) {
+                clearTimeout(timerTimeout);
+                timerTimeout = null;
+            }
+            isTimerRunning = false;
+            isNormalClock = true;
+            document.getElementById('timerBtn').textContent = '计时器';
+            updateClock();
+        }
+        function updateCountdown() {
+            const now = Date.now();
+            const remaining = endTime - now;
+            if (remaining <= 0) {
+                clearTimeout(timerTimeout);
+                timerTimeout = null;
+                isTimerRunning = false;
+                document.getElementById('clock').textContent = '00:00';
+                document.getElementById('timerBtn').textContent = '停止闪动';
+                startFlashing();
+                return;
+            }
+            // 用 Math.ceil 保证每个整秒数字都会显示，且严格按真实剩余时间计算
+            const totalSeconds = Math.ceil(remaining / 1000);
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            const mStr = String(m).padStart(2, '0');
+            const sStr = String(s).padStart(2, '0');
+            document.getElementById('clock').textContent = h > 0
+                ? String(h).padStart(2, '0') + ':' + mStr + ':' + sStr
+                : mStr + ':' + sStr;
+            // 精确调度到下一个整秒边界（而非固定间隔），避免 setInterval 抖动造成跳秒/卡一秒
+            let delay = remaining % 1000;
+            if (delay === 0) delay = 1000;
+            timerTimeout = setTimeout(updateCountdown, delay);
+        }
+        function startFlashing() {
+            if (isFlashing) return;
+            isFlashing = true;
+            document.getElementById('overlay').classList.add('flashing');
+            // 播放提示音频
+            const audio = document.getElementById('alertAudio');
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log('音频播放失败:', e));
+        }
+        function stopFlashing() {
+            isFlashing = false;
+            document.getElementById('overlay').classList.remove('flashing');
+            // 停止提示音频
+            const audio = document.getElementById('alertAudio');
+            audio.pause();
+            audio.currentTime = 0;
+            isNormalClock = true;
+            document.getElementById('timerBtn').textContent = '计时器';
+            updateClock();
+        }
+    </script>
+</body>
+</html>

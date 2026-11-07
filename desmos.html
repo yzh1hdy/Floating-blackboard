@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dcg-calculator-api-container-v1_13">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图形计算器</title>
+<script>window.__dcgWidgetMode = /[?&]widget=1/.test(location.search);</script>
+<link rel="icon" href="./assets/img/apps/graphing/favicon.ico">
+<link rel="stylesheet" href="./assets/build/shared_calculator_desktop-424da4099b9f289990e37d8e2062a84c0201c329.css">
+<style>
+
+:root{
+  --brand:#719eff;
+  --brand-soft:rgba(113,158,255,.14);
+  --brand-line:rgba(113,158,255,.34);
+  --panel-bg:#fff;
+  --page-bg:#f2f2f2;
+  --key-bg:#f2f2f2;
+  --key-bg-strong:#e7e7e7;
+  --line:#e7e7e7;
+  --text:#1f2937;
+  --text-muted:#808080;
+}
+html,body{height:100%;margin:0;padding:0;}
+body{
+  font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+  background:var(--page-bg);
+  overflow:hidden;
+}
+
+/* 启动加载层 */
+.dcg-loading-div-container{background:var(--page-bg)!important;}
+.dcg-loading-background-div{background:var(--line)!important;}
+.dcg-loading-div{color:var(--text-muted)!important;}
+
+/* ============ 移除最上面的顶栏 ============ */
+.dcg-sliding-interior{
+  position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;
+  width:100%!important;height:100%!important;
+}
+#dcg-header-container,
+#dcg-header,
+.dcg-header{display:none!important;}
+/* 顶栏移除后主内容区填满视口 */
+#dcg-main-content{
+  position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;
+  width:100%!important;height:100%!important;
+}
+#graph-container{top:0!important;}
+.dcg-exppanel-container{bottom:184px!important;}
+
+/* ============ 移除表达式面板顶部栏 & 右上角工具按钮 ============ */
+.dcg-expression-top-bar{display:none!important;}
+.dcg-graphpaper-toolbar{display:none!important;}
+
+/* ============ 移除在线功能（登录/保存/分享/帮助/设置抽屉/我的图表/登录提示/署名） ============ */
+.dcg-login,
+.dcg-action-save,
+.dcg-action-share,
+.dcg-action-help,
+.dcg-action-preferences,
+.dcg-action-opendrawer,
+.dcg-notice--authenticate,
+.dcg-expressions-branding,
+.dcg-graphpaper-branding,
+.dcg-current-tool-container{display:none!important;}
+.dcg-home-link{pointer-events:none;text-decoration:none!important;}
+.dcg-home-link:hover{text-decoration:none!important;}
+
+/* ============ 表达式面板美化 ============ */
+.dcg-exppanel-outer .dcg-exppanel-container{background:var(--panel-bg)!important;}
+.dcg-exppanel-outer{box-shadow:2px 0 16px rgba(31,56,88,.10)!important;}
+.dcg-exppanel{border-right:1px solid var(--line)!important;}
+.dcg-exppanel-container{border-top:none!important;}
+.dcg-expressionitem{border-radius:10px!important;margin:2px 4px;}
+.dcg-expressionitem--selected{box-shadow:0 0 0 2px var(--brand-line)!important;}
+.dcg-expressionitem:hover{background:var(--brand-soft);}
+.dcg-expressioninput, .dcg-expression-input, .dcg-exppanel textarea, .dcg-exppanel input{color:var(--text);}
+.dcg-new-expression{border-radius:9px;}
+.dcg-new-expression:hover{background:var(--brand-soft);}
+.dcg-expression-title, .dcg-expression-item-title{color:var(--text-muted);}
+
+/* ============ 画布美化 ============ */
+.dcg-grapher{background:#ffffff!important;}
+.dcg-grapher{border-left:1px solid var(--line)!important;}
+.dcg-graphpaper-zoom-control button,
+.dcg-zoom-control button{border-radius:8px!important;}
+.dcg-zoom-control button:hover,.dcg-graphpaper-zoom-control button:hover{background:var(--brand-soft)!important;color:var(--brand)!important;}
+
+/* ============ 键盘始终显示 + 为画布让位 + 美化 ============ */
+#graph-container{bottom:184px!important;}
+.dcg-keypad{
+  position:fixed!important;
+  top:auto!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+  height:auto!important;
+  width:100%!important;
+}
+.dcg-keys-container{
+  opacity:1!important;
+  transform:none!important;
+  transition:none!important;
+}
+.dcg-show-keypad-container{display:none!important;}
+.dcg-keypad{pointer-events:none;}
+.dcg-keypad .dcg-keys-container{pointer-events:auto;position:static!important;}
+
+/* 键盘按键美化 */
+.dcg-keys-background{
+  background:var(--page-bg)!important;
+  border-top:1px solid var(--line)!important;
+  box-shadow:0 -3px 14px rgba(31,56,88,.10)!important;
+  padding:6px 10px!important;
+}
+.dcg-keypad-btn{
+  border-radius:10px!important;
+  margin:3px!important;
+  transition:background .12s ease, transform .08s ease, box-shadow .12s ease;
+  font-family:inherit;
+  box-shadow:0 1px 2px rgba(31,56,88,.08)!important;
+}
+.dcg-btn-light-on-gray{background:var(--key-bg)!important;color:var(--text)!important;}
+.dcg-btn-light-on-gray:hover{background:var(--line)!important;}
+.dcg-btn-dark-on-gray{background:var(--key-bg-strong)!important;color:var(--text)!important;}
+.dcg-btn-dark-on-gray:hover{background:#d9d9d9!important;}
+.dcg-btn-blue{background:var(--brand)!important;box-shadow:0 2px 6px rgba(113,158,255,.35)!important;}
+.dcg-btn-blue:hover{background:#5a8ef2!important;}
+.dcg-keypad-btn:active{transform:scale(.94);}
+</style>
+<style>
+/* ============ 紧凑输入条模式：隐藏桌面版整页应用，仅保留文本框 + 键盘 ============ */
+#dcg-main-content,
+#dcg-header-container,
+#mygraphs-container,
+#dcg-modal-container,
+.dcg-sliding-interior,
+#whitebg,
+.dcg-loading-div-container,
+#dcg-header{display:none!important;}
+
+/* 紧凑计算器容器（父页面 iframe 撑满底部输入条） */
+#dcgInputCalc{
+  position:fixed;left:0;right:0;top:0;bottom:0;
+  background:#0b0e14;
+}
+
+/* 深色主题：图区 / 表达式面板 / 表达式框 / 键盘 */
+#dcgInputCalc .dcg-grapher{background:#0b0e14!important;border:none!important;}
+#dcgInputCalc .dcg-exppanel-outer{background:#0b0e14!important;box-shadow:none!important;}
+#dcgInputCalc .dcg-exppanel{background:#0b0e14!important;border:none!important;}
+#dcgInputCalc .dcg-exppanel-container{background:#0b0e14!important;}
+#dcgInputCalc .dcg-expressionitem{background:#12161f!important;color:#eef2ff!important;border:1px solid #2a2f3a!important;}
+#dcgInputCalc .dcg-expressioninput,
+#dcgInputCalc .dcg-expression-input,
+#dcgInputCalc .dcg-exppanel textarea,
+#dcgInputCalc .dcg-exppanel input,
+#dcgInputCalc .dcg-exppanel .dcg-expressioninput{color:#ffffff!important;}
+#dcgInputCalc .dcg-expression-title,
+#dcgInputCalc .dcg-expression-item-title{color:#9aa3b2!important;}
+#dcgInputCalc .dcg-new-expression:hover{background:rgba(113,158,255,.14)!important;}
+#dcgInputCalc .dcg-keys-background{background:#0b0e14!important;border-top:1px solid #2a2f3a!important;}
+#dcgInputCalc .dcg-btn-light-on-gray{background:#1c212b!important;color:#eef2ff!important;}
+#dcgInputCalc .dcg-btn-light-on-gray:hover{background:#262c38!important;}
+#dcgInputCalc .dcg-btn-dark-on-gray{background:#262c38!important;color:#ffffff!important;}
+#dcgInputCalc .dcg-btn-dark-on-gray:hover{background:#313947!important;}
+#dcgInputCalc .dcg-btn-blue{background:#719eff!important;}
+#dcgInputCalc .dcg-keypad-btn{border-radius:8px!important;margin:3px!important;}
+
+/* 键盘常驻显示（不依赖表达式聚焦） */
+#dcgInputCalc .dcg-keys-container{
+  opacity:1!important;transform:none!important;transition:none!important;
+}
+#dcgInputCalc .dcg-show-keypad-container{display:none!important;}
+#dcgInputCalc .dcg-keypad{pointer-events:none;}
+#dcgInputCalc .dcg-keypad .dcg-keys-container{pointer-events:auto;position:static!important;}
+#dcgInputCalc #graph-container{position:static!important;}
+</style>
+<style>
+/* ============ widget 模式：插入到白板上的���交互活图 ============
+   仅渲染图形（无表达式面板/键盘），透明底、半透明白色网格、白曲线，铺满 iframe */
+html.widget-mode, html.widget-mode body{background:transparent!important;}
+html.widget-mode #dcgInputCalc{background:transparent!important;}
+html.widget-mode #dcgInputCalc .dcg-grapher{background:transparent!important;border:none!important;}
+html.widget-mode #dcgInputCalc .dcg-exppanel-outer{display:none!important;}
+html.widget-mode #dcgInputCalc #graph-container{position:absolute!important;left:0;right:0;top:0;bottom:0!important;}
+html.widget-mode .dcg-loading-div-container{display:none!important;}
+/* widget 模式：隐藏所有非图形元素 */
+html.widget-mode .dcg-keypad{display:none!important;}
+html.widget-mode .dcg-expression-top-bar{display:none!important;}
+html.widget-mode .dcg-graphpaper-toolbar{display:none!important;}
+html.widget-mode .dcg-zoom-control,
+html.widget-mode .dcg-graphpaper-zoom-control,
+html.widget-mode .dcg-graphpaper-zoom-control-container,
+html.widget-mode .dcg-graphpaper-toolbar,
+html.widget-mode .dcg-graphpaper-toolbar-container,
+html.widget-mode .dcg-graphpaper-toolbar-item,
+html.widget-mode .dcg-graphpaper-toolbar-button,
+html.widget-mode .dcg-zoom-control button,
+html.widget-mode .dcg-graphpaper-zoom-control button,
+html.widget-mode [class*="zoom-control"]{display:none!important;}
+html.widget-mode .dcg-exppanel-container{display:none!important;}
+html.widget-mode .dcg-exppanel{display:none!important;}
+html.widget-mode #dcg-header-container{display:none!important;}
+html.widget-mode #dcg-main-content{display:none!important;}
+html.widget-mode .dcg-sliding-interior{display:none!important;}
+html.widget-mode #mygraphs-container{display:none!important;}
+html.widget-mode #dcg-modal-container{display:none!important;}
+html.widget-mode #whitebg{display:none!important;}
+html.widget-mode .dcg-current-tool-container{display:none!important;}
+
+/* widget 模式：强制 desmos 内部容器透明 */
+html.widget-mode .dcg-graphpaper,
+html.widget-mode .dcg-grapher,
+html.widget-mode .dcg-graph-container,
+html.widget-mode .dcg-graph-container>div,
+html.widget-mode canvas{background:transparent!important;}
+html.widget-mode .dcg-graphpaper-svg,
+html.widget-mode .dcg-graphpaper-svg rect,
+html.widget-mode .dcg-graphpaper-svg path{background:transparent!important;}
+html.widget-mode .dcg-graphpaper-svg rect[fill]:first-child{fill:transparent!important;}
+/* 确保 body 和 html 都透明 */
+html.widget-mode body{background:transparent!important;}
+/* ============ widget 模式：插入到白板上的可交互活图 ============
+   仅渲染图形（无表达式面板/键盘），透明底、半透明白色网格、白曲线，铺满 iframe */
+html.widget-mode, html.widget-mode body{background:transparent!important;}
+html.widget-mode #dcgInputCalc{background:transparent!important;}
+html.widget-mode #dcgInputCalc .dcg-grapher{background:transparent!important;border:none!important;}
+html.widget-mode #dcgInputCalc .dcg-exppanel-outer{display:none!important;}
+html.widget-mode #dcgInputCalc #graph-container{position:absolute!important;left:0;right:0;top:0;bottom:0!important;}
+html.widget-mode .dcg-loading-div-container{display:none!important;}
+/* widget 模式：隐藏所有非图形元素 */
+html.widget-mode .dcg-keypad{display:none!important;}
+html.widget-mode .dcg-expression-top-bar{display:none!important;}
+html.widget-mode .dcg-graphpaper-toolbar{display:none!important;}
+html.widget-mode .dcg-zoom-control,
+html.widget-mode .dcg-graphpaper-zoom-control,
+html.widget-mode .dcg-graphpaper-zoom-control-container,
+html.widget-mode .dcg-graphpaper-toolbar,
+html.widget-mode .dcg-graphpaper-toolbar-container,
+html.widget-mode .dcg-graphpaper-toolbar-item,
+html.widget-mode .dcg-graphpaper-toolbar-button,
+html.widget-mode .dcg-zoom-control button,
+html.widget-mode .dcg-graphpaper-zoom-control button,
+html.widget-mode [class*="zoom-control"]{display:none!important;}
+html.widget-mode .dcg-exppanel-container{display:none!important;}
+html.widget-mode .dcg-exppanel{display:none!important;}
+html.widget-mode #dcg-header-container{display:none!important;}
+html.widget-mode #dcg-main-content{display:none!important;}
+html.widget-mode .dcg-sliding-interior{display:none!important;}
+html.widget-mode #mygraphs-container{display:none!important;}
+html.widget-mode #dcg-modal-container{display:none!important;}
+html.widget-mode #whitebg{display:none!important;}
+html.widget-mode .dcg-current-tool-container{display:none!important;}
+
+/* widget 模式：强制 desmos 内部容器透明 */
+html.widget-mode .dcg-graphpaper,
+html.widget-mode .dcg-grapher,
+html.widget-mode .dcg-graph-container,
+html.widget-mode .dcg-graph-container>div,
+html.widget-mode canvas{background:transparent!important;}
+html.widget-mode .dcg-graphpaper-svg,
+html.widget-mode .dcg-graphpaper-svg rect,
+html.widget-mode .dcg-graphpaper-svg path{background:transparent!important;}
+html.widget-mode .dcg-graphpaper-svg rect[fill]:first-child{fill:transparent!important;}
+/* 确保 body 和 html 都透明 */
+html.widget-mode body{background:transparent!important;}
+
+/* ============ 新增：隐藏右上角 pillbox 按钮（缩放、设置等） ============ */
+html.widget-mode .dcg-pillbox-container,
+html.widget-mode .dcg-pillbox-view,
+html.widget-mode .dcg-zoominout-pillbox,
+html.widget-mode .dcg-settings-pillbox,
+html.widget-mode .dcg-reset-pillbox,
+html.widget-mode .dcg-left-pillboxes,
+html.widget-mode .dcg-right-pillbox-elements,
+html.widget-mode .dcg-left-pillbox-elements,
+html.widget-mode .dcg-overgraph-pillbox-elements,
+html.widget-mode .dcg-pillbox-element,
+html.widget-mode .dcg-pillbox-btn-interior,
+html.widget-mode .dcg-action-zoomin,
+html.widget-mode .dcg-action-zoomout,
+html.widget-mode .dcg-action-settings,
+html.widget-mode .dcg-action-zoomfit,
+html.widget-mode .dcg-action-zoomdefault,
+html.widget-mode [class*="pillbox"]{display:none!important;}
+
+/* ============ 新增：强制所有背景透明 ============ */
+html.widget-mode .dcg-graphpaper-background,
+html.widget-mode .dcg-graphpaper-svg rect[fill],
+html.widget-mode .dcg-graph-container div[style*="background"],
+html.widget-mode .dcg-grapher div[style*="background"],
+html.widget-mode #graph-container div[style*="background"],
+html.widget-mode #dcgInputCalc div[style*="background"]{background:transparent!important;}
+</style>
+</head>
+<body data-load-data="{&quot;initialProduct&quot;:&quot;graphing&quot;}">
+
+<!-- 启动加载层 -->
+<div class="dcg-loading-div-container" style="position:fixed">
+  <div class="dcg-loading-background-div"></div>
+  <div class="dcg-loading-div" style="color:#808080;background-image:none">正在加载…</div>
+</div>
+
+<div class="dcg-sliding-interior">
+  <div id="dcg-header-container"></div>
+  <div id="dcg-main-content"></div>
+</div>
+<div id="mygraphs-container"></div>
+<div id="dcg-modal-container" handleEvent="true"></div>
+<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAAAXNSR0IArs4c6QAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9wLEhYhKmtn2wYAAAAidEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVAgb24gYSBNYWOHqHdDAAAADElEQVQI12P4//8/AAX+Av7czFnnAAAAAElFTkSuQmCC" id="whitebg" aria-hidden="true" alt="">
+<!-- 紧凑输入条模式：本地 desmos 文本框 + 键盘（父页面 iframe 内） -->
+<div id="dcgInputCalc"></div>
+
+<!-- 0) 关闭前卸载守卫：拦截一切 beforeunload 注册，消除“是否离开网站”弹窗（必须先于主引擎加载） -->
+<script>
+(function () {
+  var origAdd = EventTarget.prototype.addEventListener;
+  EventTarget.prototype.addEventListener = function (type, fn, opts) {
+    if (typeof type === 'string' && type.toLowerCase() === 'beforeunload') {
+      return undefined; // 丢弃 beforeunload 注册，浏览器不再提示离开
+    }
+    return origAdd.call(this, type, fn, opts);
+  };
+  window.onbeforeunload = null;
+})();
+</script>
+
+<!-- 1) 本地中文语言包（必须先于主引擎加载，避免联网请求语言文件） -->
+<script src="./zh-CN.js"></script>
+
+<!-- 2) 离线网络守卫：拦截一切 http(s) 远程请求，保证纯本地运行；不产生弹窗与横幅 -->
+<script>
+(function () {
+  function isRemote(url) {
+    if (typeof url !== 'string') return false;
+    return /^https?:\/\//i.test(url);
+  }
+  // fetch
+  if (window.fetch) {
+    var nativeFetch = window.fetch;
+    window.fetch = function (input, init) {
+      var u = (input && input.url) ? input.url : input;
+      if (isRemote(u)) return Promise.reject(new Error('offline: blocked ' + u));
+      return nativeFetch.apply(this, arguments);
+    };
+  }
+  // XHR
+  var nativeOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (method, url) {
+    this.__offlineBlocked = isRemote(url);
+    return nativeOpen.apply(this, arguments);
+  };
+  var nativeSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function () {
+    if (this.__offlineBlocked) {
+      this.__offlineBlocked = false;
+      setTimeout(function () { try { this.dispatchEvent(new Event('error')); } catch (e) {} }.bind(this), 0);
+      return;
+    }
+    return nativeSend.apply(this, arguments);
+  };
+  // 上报信标
+  if (navigator.sendBeacon) navigator.sendBeacon = function () { return false; };
+  // 静默引擎内部非致命异常
+  window.addEventListener('unhandledrejection', function (e) { e.preventDefault(); });
+})();
+</script>
+
+<!-- 3) 引擎引导配置 -->
+<script>
+  if (typeof Desmos === 'undefined') Desmos = {};
+  Desmos.config = {};
+  Desmos.commit = '7eaca6fd4f03b8cb8d26581748a639f5babe18af';
+  // file:// 下禁用历史 API，避免引擎报错
+  if (window.location.protocol === 'file:') {
+    window.history.pushState = function () {};
+    window.history.replaceState = function () {};
+  }
+</script>
+
+<!-- 4) 主引擎（本地，与 html 同目录） -->
+<script src="./shared_calculator_desktop-d2a2d78b61138dd6e6350ca7b6dd72dfb5c01d4e.js"></script>
+
+<!-- 5) 启动后定制：兜底移除在线功能节点、顶栏、表达式顶部栏与工具按钮；保证键盘常驻 -->
+<script>
+(function () {
+  var SELECTORS = [
+    '.dcg-login',
+    '.dcg-action-save',
+    '.dcg-action-share',
+    '.dcg-action-help',
+    '.dcg-action-preferences',
+    '.dcg-action-opendrawer',
+    '.dcg-notice--authenticate',
+    '.dcg-expressions-branding',
+    '.dcg-graphpaper-branding',
+    '.dcg-current-tool-container',
+    '#dcg-header-container',
+    '.dcg-expression-top-bar',
+    '.dcg-graphpaper-toolbar'
+  ];
+  function cleanup() {
+    SELECTORS.forEach(function (sel) {
+      document.querySelectorAll(sel).forEach(function (n) {
+        // 不触碰紧凑输入计算器（#dcgInputCalc）内部节点
+        if (n.closest && n.closest('#dcgInputCalc')) return;
+        n.remove();
+      });
+    });
+    document.querySelectorAll('.dcg-home-link').forEach(function (a) {
+      a.removeAttribute('href');
+      a.style.pointerEvents = 'none';
+    });
+    var keys = document.querySelector('.dcg-keys-container');
+    if (keys) {
+      keys.style.opacity = '1';
+      keys.style.transform = 'none';
+      keys.removeAttribute('aria-hidden');
+    }
+    window.onbeforeunload = null;
+  }
+  var timer = setInterval(cleanup, 350);
+  setTimeout(function () { clearInterval(timer); cleanup(); }, 10000);
+  window.addEventListener('load', cleanup);
+})();
+</script>
+
+<!-- 6) 白板桥接：底部输入条内的本地 desmos（文本框 + 键盘）。读取本页输入计算器的表达式，
+     用离屏计算器渲染成透明背景/无网格/白色曲线后回传给白板插入。 -->
+<script>
+(function () {
+  var inputCalc = null;
+  var initStarted = false;
+
+  // 引擎加载后初始化紧凑输入计算器（文本框 + 键盘），直接持有实例引用，不依赖整页应用
+  function initInputCalc() {
+    if (window.__dcgWidgetMode) return; // widget 模式不创建带键盘的输入计算器
+    if (initStarted) return;
+    initStarted = true;
+    var tries = 0;
+    var iv = setInterval(function () {
+      tries++;
+      var el = document.getElementById('dcgInputCalc');
+      if (el && window.Desmos && typeof window.Desmos.GraphingCalculator === 'function') {
+        clearInterval(iv);
+        try {
+          inputCalc = window.Desmos.GraphingCalculator(el, {
+            expressions: true,
+            keypadAlwaysVisible: true,
+            settings: {
+              backgroundColor: '#0b0e14',
+              gridColor: '#1c2230',
+              xAxisNumbers: true,
+              yAxisNumbers: true
+            }
+          });
+          try { if (inputCalc.focusFirstExpression) inputCalc.focusFirstExpression(); } catch (e) {}
+        } catch (err) {
+          inputCalc = null;
+          console.warn('desmos input init failed', err);
+        }
+      } else if (tries > 120) {
+        clearInterval(iv);
+      }
+    }, 100);
+  }
+  initInputCalc();
+
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!d || d.type !== 'dcg-insert') return;
+    doInsert();
+  });
+
+  function doInsert() {
+    if (!inputCalc) { postError('函数绘图器尚未就绪，请稍候再试'); return; }
+    var list = [];
+    try { list = (inputCalc.getState().expressions || {}).list || []; } catch (err) { postError('读取表达式失败'); return; }
+    var latexList = [];
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      if (it && it.type === 'expression' && it.latex && it.visible !== false) {
+        latexList.push(String(it.latex).trim());
+      }
+    }
+    if (!latexList.length) { postError('请先输入函数表达式'); return; }
+
+    // 离屏输出计算器：透明背景、很透明白色的网格/坐标轴、白色曲线，与可见输入区相互独立
+    var div = document.createElement('div');
+    div.style.cssText = 'position:fixed;left:-12000px;top:0;width:1000px;height:720px;';
+    document.body.appendChild(div);
+    var out;
+    try {
+      out = window.Desmos.GraphingCalculator(div, {
+        expressions: false,
+        settings: {
+          // 透明背景，网格/坐标轴使用半透明白色
+          backgroundColor: 'transparent',
+          transparentBackground: true,
+          textColor: 'rgba(255,255,255,0.35)',
+          gridColor: 'rgba(255,255,255,0.25)',
+          axisColor: 'rgba(255,255,255,0.4)',
+          xAxisNumbers: false,
+          yAxisNumbers: false,
+          polarNumbers: false,
+          arrows: false,
+          labels: false,
+          degreeMode: false
+        }
+      });
+    } catch (err) { postError('初始化渲染引擎失败'); return; }
+
+    var tries = 0;
+    var iv = setInterval(function () {
+      tries++;
+      var ok = false;
+      try { ok = !!out && typeof out.screenshot === 'function' && typeof out.setExpression === 'function'; } catch (e) { ok = false; }
+      if (ok) {
+        clearInterval(iv);
+        finishInsert(out, latexList, div);
+      } else if (tries > 60) {
+        clearInterval(iv);
+        postError('渲染引擎加载超时');
+      }
+    }, 150);
+  }
+
+  function finishInsert(out, latexList, div) {
+    try {
+      for (var i = 0; i < latexList.length; i++) {
+        out.setExpression({ id: 'dcgx' + i, latex: latexList[i], color: '#ffffff00', lineWidth: 4, hidden: false });
+      }
+      out.setGraphSettings({
+        backgroundColor: 'transparent',
+        transparentBackground: true,
+        textColor: 'rgba(255,255,255,0.35)',
+        gridColor: 'rgba(255,255,255,0.25)',
+        axisColor: 'rgba(255,255,255,0.4)',
+        xAxisNumbers: false,
+        yAxisNumbers: false,
+        polarNumbers: false,
+        arrows: false,
+        labels: false,
+        degreeMode: false
+      });
+    } catch (err) { postError('生成图像失败'); return; }
+
+    // 给表达式一帧渲染时间后再截图，避免空白
+    setTimeout(function () {
+      var dataUrl = null;
+      try {
+        dataUrl = out.screenshot({
+          mode: 'contain',
+          width: 1000,
+          height: 720,
+          targetPixelRatio: 2,
+          transparentBackground: true,
+          margin: 12
+        });
+      } catch (e) { dataUrl = null; }
+      // 兜底：个别参数不兼容时用最小参数重试
+      if (!dataUrl) {
+        try {
+          dataUrl = out.screenshot({ mode: 'contain', width: 1000, height: 720, targetPixelRatio: 2, transparentBackground: true, margin: 12 });
+        } catch (e) { dataUrl = null; }
+      }
+      try { out.destroy(); } catch (e) {}
+      if (div.parentNode) div.parentNode.removeChild(div);
+      if (dataUrl) {
+        // latexList 供父页面创建白板上的可交互活图（widget）；dataUrl 作为兜底静态图
+        window.parent.postMessage({ type: 'dcg-screenshot', dataUrl: dataUrl, latexList: latexList }, '*');
+      } else {
+        postError('生成图像失败');
+      }
+    }, 60);
+  }
+
+  function postError(msg) {
+    try { window.parent.postMessage({ type: 'dcg-error', msg: msg }, '*'); } catch (e) {}
+  }
+})();
+</script>
+
+<!-- 7) widget 模式：在白板上作为可交互活图使用（只渲染图形，拖动平移/滚轮缩放为 desmos 原生行为） -->
+<script>
+(function () {
+  if (!window.__dcgWidgetMode) return;
+  document.documentElement.classList.add('widget-mode');
+  var q = (window.location.search || '').slice(1);
+  var params = {};
+  q.split('&').forEach(function (kv) {
+    var i = kv.indexOf('=');
+    if (i > 0) params[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1));
+  });
+  var exprs = (params.expr || '').split('\u0001').filter(function (s) { return s && String(s).trim(); });
+  var tries = 0;
+  var iv = setInterval(function () {
+    tries++;
+    if (window.Desmos && typeof window.Desmos.GraphingCalculator === 'function') {
+      clearInterval(iv);
+      try {
+        var el = document.getElementById('dcgInputCalc');
+        if (!el) {
+          el = document.createElement('div');
+          el.style.cssText = 'position:fixed;left:0;right:0;top:0;bottom:0;';
+          document.body.appendChild(el);
+        }
+        var calc = window.Desmos.GraphingCalculator(el, {
+          expressions: false,
+          settings: {
+            // 透明背景，网格/坐标轴使用半透明白色
+            backgroundColor: 'transparent',
+            transparentBackground: true,
+            showGrid: true,
+            showXAxis: true,
+            showYAxis: true,
+            textColor: 'rgba(255,255,255,0.35)',
+            gridColor: 'rgba(255,255,255,0.32)',
+            axisColor: 'rgba(255,255,255,0.48)',
+            xAxisNumbers: false,
+            yAxisNumbers: false,
+            polarNumbers: false,
+            arrows: false,
+            labels: false,
+            degreeMode: false
+          }
+        });
+        exprs.forEach(function (lt, i) {
+          try { calc.setExpression({ id: 'w' + i, latex: lt, color: '#ffffff00fff', lineWidth: 4, hidden: false }); } catch (e) {}
+        });
+        // 初始视野缩放到能容纳全部曲线
+        try {
+          if (typeof calc.setMathBounds === 'function') {
+            calc.setMathBounds({ left: -10, right: 10, top: 10, bottom: -10 });
+          }
+        } catch (e) {}
+        window.__dcgWidgetCalc = calc;
+      } catch (e) {}
+    } else if (tries > 120) {
+      clearInterval(iv);
+    }
+  }, 100);
+})();
+</script>
+</body>
+</html>
