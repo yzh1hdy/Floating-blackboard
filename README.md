@@ -6,9 +6,10 @@ Floating‑blackboard 交互式浮动白板
 ## 功能
 - 矢量画笔、橡皮、手掌大面积擦除、几何绘图（直线/圆形）、框选移动缩放
 - 摄像头展台模式，画布批注实物，拍照+本地相册
-- 多页白板、双页书写、撤销
+- 多页白板、双页书写（避开屏幕反光）
 - 透明穿透模式，在PPT、软件上面批注
-- 抽学号、计时器、Desmos函数绘图器
+- 抽学号、计时器、插入Desmos函数绘图器、计算器
+- 自动检测PowerPoint放映，支持控制翻页及跟随批注
 
 ## 使用
 安装[WebView2 Runtime](https://developer.microsoft.com/zh‑cn/microsoft‑edge/webview2)
