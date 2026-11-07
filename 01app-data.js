@@ -38,6 +38,7 @@
             moreMenuOpen: false,
             videoMenuOpen: false,
             activeTouches: new Map(),
+            touchPan: null,
             canvas: null,
             ctx: null,
             dpr: 1,
@@ -49,11 +50,12 @@
             currentStrokePoints: [],
             isDrawingFrame: false,
             pendingPoints: [],
-            gridEnabled: false,
-            gridSize: 30,
-            gridCanvas: null,
-            gridCtx: null,
-            autoCorrectionEnabled: false,
+            boxSelectEnabled: false,
+            multiFingerWrite: true, // 多指书写开关：关闭后双指拖动改为平移画布（默认开启=现在状态）
+            selection: [],
+            selCanvas: null,
+            selCtx: null,
+            selDrag: null,
             circles: [],
             lines: [],
             shapeMode: null, // 'circle', 'line', 'dashed'
@@ -68,8 +70,13 @@
             videoView: { scale: 1, tx: 0, ty: 0 },
             videoRect: null,
             transparentMode: false,
+            // 外部 PowerPoint 放映批注：pptActive 进入批注态；pptPages 以幻灯片页码为键保存独立笔迹
+            pptActive: false,
+            pptPages: null,
+            pptCurrent: 0,
+            pptTotal: 0,
             isMegaEraser: false,
-            megaEraserThreshold: 400, // 触发阈值 px²
+            megaEraserThreshold: 300, // 触发阈值 px²
             megaEraserRadius: 100,
             normalEraserRadius: 25,
             touchStartArea: 0,
@@ -79,9 +86,12 @@
             preEraserTool: 'pen',
             mousePassthrough: false,
             passthroughBlockCount: 0,  // 打开中的覆盖层计数，>0 时临时取消穿透
+            collapsedForcedPassthrough: false, // PPT 批注态收起工具栏期间强制开启穿透，期间工具切换不得改动穿透开关
             undoLimit: 100,
             normalScrollY: 0,
+            normalScrollX: 0,
             normalScrollLimit: 5400,
+            normalScrollUpLimit: 2520,
             doublePageMode: false,
             pendingDoublePage: false,
             activeDoublePage: 0
@@ -89,14 +99,14 @@
 
         // 毫秒前两位(0-99)到学号的映射表
         const msToStudentMap = {
-            0: '01', 1: '02', 2: '03', 3: '04', 4: '05', 5: '37', 6: '07', 7: '08', 8: '09', 9: '10',
+            0: '01', 1: '02', 2: '03', 3: '04', 4: '05', 5: '35', 6: '07', 7: '08', 8: '09', 9: '10',
             10: '11', 11: '12', 12: '13', 13: '14', 14: '15', 15: '16', 16: '17', 17: '18', 18: '19', 19: '20',
             20: '21', 21: '22', 22: '23', 23: '24', 24: '25', 25: '26', 26: '27', 27: '28', 28: '29', 29: '30',
-            30: '31', 31: '30', 32: '27', 33: '34', 34: '35', 35: '36', 36: '37', 37: '01', 38: '02', 39: '03',
+            30: '31', 31: '30', 32: '27', 33: '34', 34: '35', 35: '36', 36: '34', 37: '01', 38: '02', 39: '03',
             40: '04', 41: '05', 42: '33', 43: '07', 44: '08', 45: '09', 46: '10', 47: '11', 48: '12', 49: '13',
             50: '14', 51: '15', 52: '16', 53: '17', 54: '18', 55: '19', 56: '20', 57: '21', 58: '22', 59: '23',
             60: '24', 61: '25', 62: '26', 63: '27', 64: '28', 65: '29', 66: '30', 67: '31', 68: '32', 69: '28',
-            70: '34', 71: '35', 72: '36', 73: '37', 74: '01', 75: '02', 76: '03', 77: '04', 78: '05', 79: '31',
+            70: '34', 71: '35', 72: '36', 73: '32', 74: '01', 75: '02', 76: '03', 77: '04', 78: '05', 79: '31',
             80: '07', 81: '08', 82: '09', 83: '10', 84: '11', 85: '12', 86: '13', 87: '14', 88: '15', 89: '16',
             90: '17', 91: '18', 92: '19', 93: '20', 94: '21', 95: '22', 96: '23', 97: '24', 98: '25', 99: '26'
         };
@@ -108,7 +118,6 @@
         const moreMenu = document.getElementById('moreMenu');
         const videoMenu = document.getElementById('videoMenu');
         const aboutDialog = document.getElementById('aboutDialog');
-        const gridCanvas = document.getElementById('grid-canvas');
         const videoBackground = document.getElementById('video-background');
         const videoWrap = document.getElementById('video-bg-wrap');
 

@@ -74,7 +74,35 @@ function closePenMenu(animate = true) {
 }
 
 
+// ===== 图形二级菜单 =====
+function openShapeSubmenu() {
+    const mainGrid = document.getElementById('moreMenuMainGrid');
+    const subGrid = document.getElementById('shapeSubmenuGrid');
+    const header = document.getElementById('moreMenuHeader');
+    if (mainGrid) mainGrid.style.display = 'none';
+    if (subGrid) subGrid.style.display = 'grid';
+    if (header) header.textContent = '图形';
+}
+
+function closeShapeSubmenu() {
+    const mainGrid = document.getElementById('moreMenuMainGrid');
+    const subGrid = document.getElementById('shapeSubmenuGrid');
+    const header = document.getElementById('moreMenuHeader');
+    if (mainGrid) mainGrid.style.display = 'grid';
+    if (subGrid) subGrid.style.display = 'none';
+    if (header) header.textContent = '更多功能';
+}
+
+function shapePlaceholder(name) {
+    closeMoreMenu();
+    if (typeof insertCoordinateShape === 'function') {
+        insertCoordinateShape(name === '坐标系' ? 'coordinateSystem' : 'nonNegativeQuadrant');
+    }
+}
+
 function handleMoreClick(e) {
+    // PPT 播放模式下让"更多"按钮失效：点击不打开菜单
+    if (typeof state !== 'undefined' && state.pptActive) return;
     var event = e || window.event;
     if (event) {
         event.stopPropagation();
@@ -91,6 +119,7 @@ function handleMoreClick(e) {
 function openMoreMenu() {
     closePenMenu(false);
     closeVideoMenu(false);
+    closeShapeSubmenu();
     if (moreMenu._closeTimer) window.clearTimeout(moreMenu._closeTimer);
     state.moreMenuOpen = true;
     moreMenu.classList.remove('fade-out');
@@ -225,8 +254,8 @@ function resetSliderClear() {
                 closeEraserMenu();
                 eraserMenu.classList.remove('fade-out');
             }, 300);
-            // 清空后：透明模式切回鼠标；非透明模式切回进入橡皮前的工具
-            var restoreTool = state.transparentMode ? 'mouse' : ((state.preEraserTool === 'mouse') ? 'mouse' : 'pen');
+            // 清空后：切回进入橡皮前的工具（鼠标或笔），透明模式下也保持一致
+            var restoreTool = (state.preEraserTool === 'mouse') ? 'mouse' : 'pen';
             if (typeof setTool === 'function') {
                 setTool(restoreTool);
             }
@@ -273,12 +302,16 @@ function toggleTransparentMode() {
         disableTransparentMode();
         setPenColor('#ffffff', findColorBtn('#ffffff'));
         disableMousePassthrough();
+        // 退出透明模式：立即复位翻页工具栏并退出 PPT 批注态（避免残留批注 UI/收起按钮）
+        if (typeof window.resetPageTurnMode === 'function') window.resetPageTurnMode();
     }
+    notifyTransparentMode();
     const textEl = document.getElementById('transparentModeText');
     if (textEl) {
         textEl.textContent = state.transparentMode ? '退出透明' : '透明模式';
     }
     if (typeof updateWatermark === 'function') updateWatermark();
+    if (typeof syncFunctionWidgets === 'function') syncFunctionWidgets();
     closeMoreMenu();
 }
 function enableTransparentMode() {
@@ -299,11 +332,22 @@ function openVideoMenu() {
     closePenMenu();
     state.videoMenuOpen = true;
     videoMenu.classList.add('show');
+    // 只绑定一次：点击视频菜单其他区域时收起摄像头下拉
+    if (!videoMenu._cameraDropdownBound) {
+        videoMenu._cameraDropdownBound = true;
+        videoMenu.addEventListener('click', (e) => {
+            if (!e.target.closest('#cameraSelectBtn') && !e.target.closest('#cameraDropdown')) {
+                closeCameraDropdown();
+            }
+        });
+    }
+    closeCameraDropdown();
     enumerateCameras();
 }
 function closeVideoMenu() {
     state.videoMenuOpen = false;
     videoMenu.classList.remove('show');
+    closeCameraDropdown();
 }
 
 function confirmExitVideoMode() {
@@ -357,6 +401,7 @@ function stopCamera() {
     if (!state.switchingCamera && typeof window.onVideoModeExited === 'function') {
         try { window.onVideoModeExited(); } catch (_) { }
     }
+    if (typeof syncFunctionWidgets === 'function') syncFunctionWidgets();
 }
 
 const CAMERA_PREFERRED_WIDTH = 3840;
@@ -406,6 +451,7 @@ async function maximizeCameraResolution(track) {
 async function startCamera(statusEl, switchEl) {
     try {
         statusEl.textContent = '正在请求摄像头权限...';
+        // 首次请求用于授予权限，使设备列表能返回摄像头真实名称
         const stream = await navigator.mediaDevices.getUserMedia(buildCameraConstraints());
         state.videoStream = stream;
         videoBackground.srcObject = stream;
@@ -427,6 +473,7 @@ async function startCamera(statusEl, switchEl) {
         if (state.videoBackgroundEnabled && typeof syncVideoLayout === 'function') {
             syncVideoLayout();
         }
+        if (typeof syncFunctionWidgets === 'function') syncFunctionWidgets();
         if (typeof window.onVideoModeEntered === 'function') {
             try { window.onVideoModeEntered(); } catch (_) { }
         }
@@ -471,26 +518,64 @@ function rotateVideoCW() {
 }
 
 async function enumerateCameras() {
-    const select = document.getElementById('cameraSelect');
     const container = document.getElementById('cameraSelector');
-    if (!select || !container) return;
+    const dropdown = document.getElementById('cameraDropdown');
+    const btnText = document.getElementById('cameraSelectText');
+    if (!container || !dropdown || !btnText) return;
     try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const cams = devices.filter(d => d.kind === 'videoinput');
-        select.innerHTML = '';
+        closeCameraDropdown();
+        dropdown.innerHTML = '';
         cams.forEach((cam, idx) => {
-            const opt = document.createElement('option');
-            opt.value = cam.deviceId;
-            opt.textContent = cam.label || ('摄像头 ' + (idx + 1));
-            select.appendChild(opt);
+            const item = document.createElement('div');
+            item.className = 'camera-option' + (state.selectedCameraId === cam.deviceId ? ' active' : '');
+            item.setAttribute('data-device-id', cam.deviceId);
+            item.textContent = cam.label || ('摄像头 ' + (idx + 1));
+            item.addEventListener('click', () => selectCameraOption(cam.deviceId));
+            dropdown.appendChild(item);
         });
         container.style.display = cams.length > 1 ? 'block' : 'none';
-        if (state.selectedCameraId) {
-            select.value = state.selectedCameraId;
-        }
+        let current = null;
+        if (state.selectedCameraId) current = cams.find(c => c.deviceId === state.selectedCameraId);
+        if (!current) current = cams[0];
+        btnText.textContent = current ? (current.label || '摄像头') : '无可用摄像头';
     } catch (err) {
         console.warn('枚举摄像头失败:', err);
     }
+}
+
+function toggleCameraDropdown(e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const dd = document.getElementById('cameraDropdown');
+    const btn = document.getElementById('cameraSelectBtn');
+    if (!dd || !btn) return;
+    const open = dd.classList.contains('open');
+    dd.classList.toggle('open', !open);
+    btn.classList.toggle('open', !open);
+}
+
+function closeCameraDropdown() {
+    const dd = document.getElementById('cameraDropdown');
+    const btn = document.getElementById('cameraSelectBtn');
+    if (dd) dd.classList.remove('open');
+    if (btn) btn.classList.remove('open');
+}
+
+function selectCameraOption(deviceId) {
+    closeCameraDropdown();
+    const dropdown = document.getElementById('cameraDropdown');
+    const btnText = document.getElementById('cameraSelectText');
+    if (dropdown) {
+        dropdown.querySelectorAll('.camera-option').forEach(el => {
+            el.classList.toggle('active', el.getAttribute('data-device-id') === deviceId);
+        });
+    }
+    if (btnText) {
+        const active = dropdown ? dropdown.querySelector('.camera-option.active') : null;
+        if (active) btnText.textContent = active.textContent;
+    }
+    onCameraChanged(deviceId);
 }
 
 async function onCameraChanged(deviceId) {
@@ -524,16 +609,23 @@ async function toggleVideoBackground() {
             disableTransparentMode();
             disableMousePassthrough();
             state.transparentMode = false;
+            notifyTransparentMode();
+            if (typeof window.resetPageTurnMode === 'function') window.resetPageTurnMode();
             const textEl = document.getElementById('transparentModeText');
             if (textEl) textEl.textContent = '透明模式';
         }
         await startCamera(statusEl, switchEl);
         if (state.videoBackgroundEnabled) {
-            // 首次打开视频背景时，画面默认顺时针转 90 度
-            if (!state.videoAutoRotatedOnce) {
-                state.videoAutoRotatedOnce = true;
-                state.videoRotation = 1;
+            // 每次打开视频背景时按画面宽高判断方向：竖向画面保持不变，横向画面顺时针转 90 度转为竖向
+            let vw = 0, vh = 0;
+            const track = state.videoStream && state.videoStream.getVideoTracks
+                ? state.videoStream.getVideoTracks()[0] : null;
+            if (track && typeof track.getSettings === 'function') {
+                const s = track.getSettings();
+                if (s && s.width && s.height) { vw = s.width; vh = s.height; }
             }
+            if (!vw || !vh) { vw = videoBackground.videoWidth; vh = videoBackground.videoHeight; }
+            state.videoRotation = vw > vh ? 1 : 0;
             clearCanvasImmediate();
             if (typeof syncVideoLayout === 'function') syncVideoLayout();
         }
@@ -609,11 +701,12 @@ function executeResetAll() {
     state.strokes = [];
     state.undoStack = [];
     state.erasingNow = new Set();
+    if (typeof clearAllFunctionWidgets === 'function') clearAllFunctionWidgets();
     if (state.ctx && state.canvas) {
         state.ctx.clearRect(0, 0, state.canvas.width / state.dpr, state.canvas.height / state.dpr);
     }
     updateUI();
     closeResetAllModal();
 }
-//（注：内容由AI生成）
+
 

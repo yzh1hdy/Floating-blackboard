@@ -18,13 +18,12 @@
     </div>
     <div id="canvas-container" class="cursor-pen w-full h-full fixed inset-0">
         <img id="watermark" src="水印.png" alt="" draggable="false">
+        <div id="functionLayer"></div>
     </div>
     <div id="doublePageOverlay" class="double-page-overlay">
         <div class="double-page-divider"></div>
     </div>
     <canvas id="mega-eraser-preview"></canvas>
-    <canvas id="grid-canvas"></canvas>
-    <div id="scrollIndicator"><div id="scrollIndicatorThumb"></div></div>
     <button id="btn-hide" onclick="hideWebLayer()"
             style="position: fixed; bottom: 42px; left: -20px; z-index: 1000; width: 80px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 30px; background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); border: 2px solid rgba(255,255,255,0.25); color: rgba(255,255,255,0.9); cursor: pointer;">
            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -53,6 +52,7 @@
     </div>
     <div class="toolbar" id="toolbar">
         <div class="tool-highlight" id="toolHighlight" aria-hidden="true"></div>
+        <div id="iconInvertLayer" aria-hidden="true"></div>
         <div style="position: relative;">
             <button id="tool-mouse" class="tool-btn" onclick="handleMouseClick()" ontouchstart="handleMouseTouch(event)">
                 <img id="img-mouse" src="icon/鼠标.png" alt="鼠标">
@@ -65,11 +65,9 @@
             <div id="penMenu" class="pen-menu">
                 <div class="pen-menu-header">画笔设置</div>
                 <div class="color-section">
-                    <span class="section-label">颜色</span>
                     <div class="color-palette" id="colorPalette"></div>
                 </div>
                 <div class="size-section">
-                    <span class="section-label">粗细</span>
                     <div class="size-presets">
                         <button class="size-preset-btn" onclick="setPenSize(1)" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
                             <div class="size-preset-dot" style="width: 4px; height: 4px;"></div>
@@ -86,9 +84,13 @@
                     </div>
                 </div>
                 <div class="grid-section">
-                    <div class="grid-toggle" onclick="toggleAutoCorrection()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
-                        <span class="grid-toggle-label">自动校正</span>
-                        <div class="grid-toggle-switch" id="autoCorrectionSwitch"></div>
+                    <div class="grid-toggle" onclick="toggleBoxSelect()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
+                        <span class="grid-toggle-label">鼠标框选</span>
+                        <div class="grid-toggle-switch" id="boxSelectSwitch"></div>
+                    </div>
+                    <div class="grid-toggle" onclick="toggleMultiFingerWrite()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
+                        <span class="grid-toggle-label">多指书写</span>
+                        <div class="grid-toggle-switch" id="multiFingerSwitch"></div>
                     </div>
                 </div>
             </div>
@@ -110,23 +112,24 @@
             <img id="img-undo" src="icon/撤回.png" alt="撤回">
         </button>
         <div style="position: relative;">
-            <button id="btn-more" class="tool-btn" onclick="handleMoreClick(event)" ontouchstart="handleMoreTouch(event)">
+            <button id="btn-more" class="tool-btn" onclick="handleMoreClick(event)" ontouchstart="handleMoreTouch(event)" title="更多功能">
                 <img id="img-more" src="icon/更多.png" alt="更多">
             </button>
             <div id="moreMenu" class="more-menu" onclick="event.stopPropagation()">
-                <div class="more-menu-header">更多功能</div>
-                <div class="more-menu-grid">
-                    <button class="more-menu-btn" onclick="startShapeDraw('circle')" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
+                <div class="more-menu-header" id="moreMenuHeader">更多功能</div>
+                <div class="more-menu-grid" id="moreMenuMainGrid">
+                    <button class="more-menu-btn" onclick="openShapeSubmenu()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="9" />
+                            <circle cx="12" cy="12" r="7" />
+                            <line x1="4" y1="20" x2="20" y2="4" />
                         </svg>
-                        <span>圆形</span>
+                        <span>图形</span>
                     </button>
-                    <button class="more-menu-btn" onclick="startShapeDraw('line')" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
+                    <button class="more-menu-btn" onclick="openDesmos()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="5" y1="19" x2="19" y2="5" />
+                            <text x="12" y="18" text-anchor="middle" font-size="15" font-weight="normal" fill="currentColor" stroke="none" font-family="Arial, sans-serif">f(x)</text>
                         </svg>
-                        <span>直线</span>
+                        <span>函数</span>
                     </button>
                     <button class="more-menu-btn" onclick="openTimer()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -151,11 +154,54 @@
                     <button class="more-menu-btn" onclick="showAbout()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10" />
-                            <path d="M12 16v-4" />
-                            <path d="M12 8h.01" />
+                            <path d="M12 11v5" />
+                            <circle cx="12" cy="7.5" r="0.5" fill="currentColor" />
                         </svg>
                         <span>关于</span>
                     </button>
+                </div>
+                <div class="more-menu-grid" id="shapeSubmenuGrid" style="display:none;">
+                    <button class="more-menu-btn" onclick="startShapeDraw('circle')" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="9" />
+                        </svg>
+                        <span>圆形</span>
+                    </button>
+                    <button class="more-menu-btn" onclick="startShapeDraw('line')" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="5" y1="19" x2="19" y2="5" />
+                        </svg>
+                        <span>直线</span>
+                    </button>
+                    <button class="more-menu-btn" onclick="startShapeDraw('dashed')" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3">
+                            <line x1="5" y1="19" x2="19" y2="5" />
+                        </svg>
+                        <span>虚线</span>
+                    </button>
+                    <button class="more-menu-btn" onclick="shapePlaceholder('坐标系')" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="3" x2="12" y2="21" />
+                            <line x1="3" y1="12" x2="21" y2="12" />
+                        </svg>
+                        <span>坐标系</span>
+                    </button>
+                    <button class="more-menu-btn" onclick="closeShapeSubmenu()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6" />
+                        </svg>
+                        <span>返回</span>
+                    </button>
+                    <button class="more-menu-btn" onclick="shapePlaceholder('非负象限')" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="7" y1="21" x2="7" y2="6" />
+                            <polyline points="3.5 9.5 7 6 10.5 9.5" />
+                            <line x1="7" y1="21" x2="20" y2="21" />
+                            <polyline points="16.5 18 20 21 16.5 24" />
+                        </svg>
+                        <span>非负象限</span>
+                    </button>
+                    
                 </div>
             </div>
             <div id="videoMenu" class="video-menu" onclick="event.stopPropagation()">
@@ -173,7 +219,11 @@
                 <div class="video-status" id="videoStatus">摄像头已关闭</div>
                 <div class="camera-selector" id="cameraSelector" style="display:none;">
                     <div class="camera-selector-label">选择摄像头</div>
-                    <select id="cameraSelect" class="camera-select" onchange="onCameraChanged(this.value)"></select>
+                    <div class="camera-select-btn" id="cameraSelectBtn" onclick="toggleCameraDropdown(event)">
+                        <span class="camera-select-btn-text" id="cameraSelectText">请选择摄像头</span>
+                        <svg class="camera-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                    <div class="camera-dropdown" id="cameraDropdown"></div>
                 </div>
                 <div class="video-rotate-row">
                     <button id="videoRotateBtn" class="video-rotate-btn" onclick="rotateVideoCW()" ontouchstart="handleTouchStartBtn(event)" ontouchmove="handleTouchMoveBtn(event)" ontouchend="handleTouchEndBtn(event)">
@@ -188,6 +238,34 @@
         </div>
         <button id="btn-lottery" class="tool-btn" onclick="showLottery()" ontouchstart="handleLotteryTouch(event)">
             <img id="img-lottery" src="icon/抽学号.png" alt="抽学号">
+        </button>
+    </div>
+    <button id="expandToolbarBtn" class="expand-toolbar-btn" onclick="expandToolbar()" ontouchstart="handleExpandTouch(event)" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 15l-6-6-6 6" />
+        </svg>
+        <span>展开工具栏</span>
+    </button>
+    <div class="toolbar page-turn-toolbar" id="pageTurnLeft" style="display:none;">
+        <button class="tool-btn page-turn-btn" data-action="exit" onclick="pageTurnAction('exit')" ontouchstart="pageTurnTouch(event)" title="退出">
+            <img src="icon/ESC.png" alt="退出">
+        </button>
+        <button class="tool-btn page-turn-btn" data-action="left" onclick="pageTurnAction('left')" ontouchstart="pageTurnTouch(event)" title="向左">
+            <img src="icon/向左.png" alt="向左">
+        </button>
+        <button class="tool-btn page-turn-btn" data-action="right" onclick="pageTurnAction('right')" ontouchstart="pageTurnTouch(event)" title="向右">
+            <img src="icon/向右.png" alt="向右">
+        </button>
+    </div>
+    <div class="toolbar page-turn-toolbar" id="pageTurnRight" style="display:none;">
+        <button class="tool-btn page-turn-btn" data-action="left" onclick="pageTurnAction('left')" ontouchstart="pageTurnTouch(event)" title="向左">
+            <img src="icon/向左.png" alt="向左">
+        </button>
+        <button class="tool-btn page-turn-btn" data-action="right" onclick="pageTurnAction('right')" ontouchstart="pageTurnTouch(event)" title="向右">
+            <img src="icon/向右.png" alt="向右">
+        </button>
+        <button class="tool-btn page-turn-btn" data-action="exit" onclick="pageTurnAction('exit')" ontouchstart="pageTurnTouch(event)" title="退出">
+            <img src="icon/ESC.png" alt="退出">
         </button>
     </div>
     <div id="cameraToolbar">
@@ -219,15 +297,19 @@
             |  关闭Timer
         </button>
     </div>
-    <div id="desmosOverlay" class="timer-overlay" style="display:none;">
+    <div id="desmosOverlay" style="display:none;">
+        <div class="desmos-bar-header">
+            <span class="desmos-bar-title">函数绘图器 · 输入函数后点“插入图像”</span>
+            <button id="desmosInsertBtn" onclick="insertFunctionImageRequest()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+                <span>插入图像</span>
+            </button>
+            <button id="desmosCloseBtn" onclick="closeDesmos()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <span>关闭</span>
+            </button>
+        </div>
         <iframe id="desmosFrame" src="about:blank" title="函数绘图器" allow="autoplay"></iframe>
-        <button id="desmosCloseBtn" class="timer-close-btn" onclick="closeDesmos()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-            <span>|  关闭函数绘图器</span>
-        </button>
     </div>
     <div class="overlay" id="clearConfirmOverlay" onclick="handleClearOverlayClick(event)">
         <div class="popup" id="clearConfirmPopup">
@@ -273,6 +355,17 @@
             <button class="btn-ok" onclick="confirmDoublePageToggle()"></button>
         </div>
     </div>
+    <div class="overlay" id="seewoExitConfirmOverlay" onclick="handleSeewoExitOverlayClick(event)">
+        <div class="popup" id="seewoExitConfirmPopup">
+            <img src="popupwin.png" class="popup-bg" alt="popup background">
+            <button class="close-btn" onclick="closeSeewoExitConfirm()"></button>
+            <div class="text-container">
+                <p>将对下方窗口发送Alt+F4</p>
+            </div>
+            <button class="btn-cancel" onclick="closeSeewoExitConfirm()"></button>
+            <button class="btn-ok" onclick="confirmSeewoExit()"></button>
+        </div>
+    </div>
     <div id="resetAllConfirmBar" class="confirm-bar">
         <div class="confirm-modal">
             <div class="confirm-modal-top-bar"></div>
@@ -298,14 +391,19 @@
         <div class="confirm-modal">
             <div class="confirm-modal-top-bar"></div>
             <div class="confirm-modal-content">
-                <img src="icon/ba.png" alt="Logo" class="about-image">
-                <div class="confirm-bar-text">
-                    <a href="https://i-blackboard.netlify.app/" target="_blank">网页版白板工具：https://i-blackboard.netlify.app/</a> 服务器流量有限 省着点谢谢 <br>Interactive Blackboard v3.4.0 _ 此项目已在GitHub上开源：<a href="https://github.com/yzh1hdy/Floating-blackboard" target="_blank">https://github.com/yzh1hdy/Floating-blackboard</a>
+                <div class="about-left">
+                    <div class="about-title">Interactive Blackboard v3.6.0</div>
+                    <div class="about-line">网页版白板工具：<a href="https://i-blackboard.netlify.app/" target="_blank">https://i-blackboard.netlify.app/</a> <span class="about-note">服务器流量有限 省着点谢谢</span></div>
+                    <div class="about-line">此项在GitHub上开源：<a href="https://github.com/yzh1hdy/Floating-blackboard" target="_blank">https://github.com/yzh1hdy/Floating-blackboard</a></div>
+                    <div class="about-buttons">
+                        <button onclick="openDesmosFullscreen()" class="about-btn about-btn-desmos">函数绘图器</button>
+                        <button onclick="confirmResetAll()" class="about-btn about-btn-reset">重置黑板</button>
+                        <button onclick="openCalculator()" class="about-btn about-btn-calculator">计算器</button>
+                        <button onclick="closeAbout()" class="about-btn about-btn-ok">确认</button>
+                    </div>
                 </div>
-                <div class="confirm-bar-buttons">
-                    <button onclick="closeAbout()" class="confirm-btn confirm-btn-cancel">确定</button>
-                    <button onclick="openDesmos()" class="confirm-btn confirm-btn-desmos">函数绘图器</button>
-                    <button onclick="confirmResetAll()" class="confirm-btn confirm-btn-confirm">重置黑板</button>
+                <div class="about-right">
+                    <img src="icon/ba.png" alt="Logo" class="about-image">
                 </div>
             </div>
         </div>
@@ -322,10 +420,12 @@
     <script src="01app-pages.js"></script>
     <script src="01app-menus.js"></script>
     <script src="01app-toolbar.js"></script>
+    <script src="01app-pageturn.js"></script>
     <script src="01app-album.js"></script>
     <script src="01app-lottery.js"></script>
     <script src="01app-init.js"></script>
     <script src="01app-hide.js"></script>
+    <script src="01app-ppt.js"></script>
 </body>
 </html>
 

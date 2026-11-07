@@ -1,7 +1,7 @@
 function init() {
     createCanvas();
-    createGridCanvas();
     createMegaEraserPreview();
+    createSelectionCanvas();
     state.strokes = [];
     state.undoStack = [];
     state.erasingNow = new Set();
@@ -9,7 +9,8 @@ function init() {
     updateUI();
     updateToolIcons();
     initPenMenu();
-    updateAutoCorrectionSwitch();
+    updateBoxSelectSwitch();
+    updateMultiFingerSwitch();
     updateToolHighlight();
     if (typeof updateWatermark === 'function') updateWatermark();
     window.addEventListener('resize', handleResize);
@@ -84,7 +85,6 @@ function init() {
             state.videoView.ty += (e.clientY - prev.y);
             applyViewTransform();
             if (typeof applyViewToContexts === 'function') applyViewToContexts();
-            if (state.gridEnabled && typeof drawGrid === 'function') drawGrid();
             renderAll();
         } else if (videoPan.mode === 'pinch') {
             const arr = Array.from(videoPan.pointers.values());
@@ -126,25 +126,38 @@ function init() {
         if (typeof syncZoomResolution === 'function') syncZoomResolution();
     }, { passive: false });
 
-    // 普通模式：鼠标工具下按住拖动 / 滚轮向下翻页
+    // 普通模式：鼠标工具下按住拖动（自由平移画布）。框选开关开启时替换为框选工具
     let normalPan = null;
     function isNormalPanMode() {
-        return typeof isNormalMode === 'function' && isNormalMode() && state.tool === 'mouse';
+        return typeof isNormalMode === 'function' && isNormalMode() && state.tool === 'mouse' && !state.boxSelectEnabled;
+    }
+    function isBoxSelectMode() {
+        // 双页书写模式坐标按半屏平移存储，与框选逻辑坐标不匹配，保持翻页而非框选
+        return typeof isNormalMode === 'function' && isNormalMode() && !state.doublePageMode && state.tool === 'mouse' && state.boxSelectEnabled;
     }
     container.addEventListener('pointerdown', function (e) {
         if (!isNormalPanMode()) return;
-        if (normalPan) return; // 仅支持单指纵向拖动
+        if (normalPan) return; // 仅支持单指拖动
         if (e.pointerType === 'mouse' && e.button !== 0) return;
+        // 鼠标工具点中函数图像 → 等比缩放（优先于画布平移）
+        if (tryImageInteract(e, clientToLogical(e.clientX, e.clientY))) return;
         e.preventDefault();
         try { container.setPointerCapture(e.pointerId); } catch (_) { }
-        normalPan = { id: e.pointerId, startY: e.clientY, baseY: state.normalScrollY || 0 };
+        normalPan = {
+            id: e.pointerId,
+            startX: e.clientX, startY: e.clientY,
+            baseX: state.normalScrollX || 0,
+            baseY: state.normalScrollY || 0
+        };
         container.classList.add('cursor-grabbing-pan');
     });
     container.addEventListener('pointermove', function (e) {
         if (!normalPan || e.pointerId !== normalPan.id) return;
         e.preventDefault();
-        const target = normalPan.baseY - (e.clientY - normalPan.startY);
-        setNormalScrollY(target);
+        setNormalScroll(
+            normalPan.baseX - (e.clientX - normalPan.startX),
+            normalPan.baseY - (e.clientY - normalPan.startY)
+        );
     });
     function normalPointerEnd(e) {
         if (!normalPan || e.pointerId !== normalPan.id) return;
@@ -154,13 +167,176 @@ function init() {
     }
     container.addEventListener('pointerup', normalPointerEnd);
     container.addEventListener('pointercancel', normalPointerEnd);
-    container.addEventListener('wheel', function (e) {
-        if (!isNormalPanMode()) return;
+
+    // 鼠标框选：普通模式 + 鼠标工具 + 框选开关开启时，鼠标拖拽执行框选 / 移动 / 缩放
+    let selPointer = null;
+
+    // 鼠标工具点中函数图像：选中并进入等比缩放（可拖动，或以四角手柄缩放）
+    function tryImageInteract(e, p) {
+        if (!(state.tool === 'mouse' && isNormalMode() && !state.doublePageMode)) return false;
+        const img = imageHitTest(p);
+        if (!img) return false;
         e.preventDefault();
-        setNormalScrollY((state.normalScrollY || 0) + e.deltaY);
-    }, { passive: false });
+        try { container.setPointerCapture(e.pointerId); } catch (_) { }
+        const isSel = state.selection.length === 1 && state.selection[0] === img;
+        state.selection = [img];
+        const h = isSel ? hitSelectionHandle(p) : -1;
+        if (h >= 0) {
+            // 已选中且点中四角手柄 → 以对角为锚点等比缩放
+            const b = selectionBounds();
+            const pad = 6;
+            const cs = [
+                [b.x - pad, b.y - pad],
+                [b.x - pad + b.w + pad * 2, b.y - pad],
+                [b.x - pad, b.y - pad + b.h + pad * 2],
+                [b.x - pad + b.w + pad * 2, b.y - pad + b.h + pad * 2]
+            ];
+            const anchor = cs[3 - h];
+            selPointer = { mode: 'imgscale', id: e.pointerId, lastX: p.x, lastY: p.y, img: img, anchorX: anchor[0], anchorY: anchor[1], x0: img.x, y0: img.y, w0: img.w, h0: img.h };
+        } else {
+            // 首次点中：以距指针最远的角为锚点，拖动即等比缩放
+            const cs = imageCorners(img);
+            let anchor = cs[0], best = -1;
+            for (const c of cs) { const d = Math.hypot(p.x - c[0], p.y - c[1]); if (d > best) { best = d; anchor = c; } }
+            selPointer = { mode: 'imgscale', id: e.pointerId, lastX: p.x, lastY: p.y, img: img, anchorX: anchor[0], anchorY: anchor[1], x0: img.x, y0: img.y, w0: img.w, h0: img.h };
+        }
+        state.selDrag = selPointer;
+        drawSelectionOverlay();
+        return true;
+    }
+
+    function boxSelectDown(e) {
+        if (!isBoxSelectMode()) return;
+        // 触屏支持：鼠标只认左键；触屏只认主触点；已有框选手势进行中时忽略并发触点
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (e.pointerType === 'touch' && e.isPrimary === false) return;
+        if (selPointer) return;
+        e.preventDefault();
+        try { container.setPointerCapture(e.pointerId); } catch (_) { }
+        const p = clientToLogical(e.clientX, e.clientY);
+
+        // 鼠标工具命中函数图像 → 直接等比缩放，不进入框选
+        if (tryImageInteract(e, p)) return;
+
+        // 已有选区：优先命中缩放手柄 → 缩放；命中选区内部 → 移动；否则开始新框选
+        if (state.selection && state.selection.length) {
+            const h = hitSelectionHandle(p);
+            if (h >= 0) {
+                const b = selectionBounds();
+                const pad = 6;
+                const corners = [
+                    [b.x - pad, b.y - pad],
+                    [b.x - pad + b.w + pad * 2, b.y - pad],
+                    [b.x - pad, b.y - pad + b.h + pad * 2],
+                    [b.x - pad + b.w + pad * 2, b.y - pad + b.h + pad * 2]
+                ];
+                const anchor = corners[3 - h];
+                // 缩放方向符号：左侧角(h=0/2)宽度随 dx 反向，顶部角(h=0/1)高度随 dy 反向
+                const signX = (h === 0 || h === 2) ? -1 : 1;
+                const signY = (h === 0 || h === 1) ? -1 : 1;
+                selPointer = {
+                    mode: 'scale', id: e.pointerId,
+                    lastX: p.x, lastY: p.y,
+                    anchorX: anchor[0], anchorY: anchor[1],
+                    signX: signX, signY: signY,
+                    uniform: h === 3   // 右下角：等比缩放不拉伸
+                };
+                state.selDrag = selPointer;
+                return;
+            }
+            if (isInsideSelection(p)) {
+                selPointer = { mode: 'move', id: e.pointerId, lastX: p.x, lastY: p.y };
+                state.selDrag = selPointer;
+                container.classList.add('cursor-grabbing-pan');
+                return;
+            }
+        }
+
+        // 新框选：清空旧选区
+        if (state.selection.length) state.selection = [];
+        selPointer = { mode: 'select', id: e.pointerId, startX: p.x, startY: p.y, rect: { x: p.x, y: p.y, w: 0, h: 0 } };
+        state.selDrag = selPointer;
+    }
+    function boxSelectMove(e) {
+        if (!selPointer || e.pointerId !== selPointer.id) return;
+        e.preventDefault();
+        const p = clientToLogical(e.clientX, e.clientY);
+        if (selPointer.mode === 'select') {
+            selPointer.rect = {
+                x: Math.min(selPointer.startX, p.x),
+                y: Math.min(selPointer.startY, p.y),
+                w: Math.abs(p.x - selPointer.startX),
+                h: Math.abs(p.y - selPointer.startY)
+            };
+        } else if (selPointer.mode === 'move') {
+            const dx = p.x - selPointer.lastX, dy = p.y - selPointer.lastY;
+            selPointer.lastX = p.x; selPointer.lastY = p.y;
+            for (const s of state.selection) translateStrokeBy(s, dx, dy);
+            renderAll();
+        } else if (selPointer.mode === 'scale') {
+            const dx = p.x - selPointer.lastX, dy = p.y - selPointer.lastY;
+            selPointer.lastX = p.x; selPointer.lastY = p.y;
+            const b = selectionBounds();
+            if (b) {
+                let sx, sy;
+                if (selPointer.uniform) {
+                    // 右下角：以左上角为锚点，按指针到锚点距离比例等比缩放
+                    const pad = 6;
+                    const w0 = Math.max(1, b.w + pad * 2);
+                    const h0 = Math.max(1, b.h + pad * 2);
+                    const k = Math.max(0.05, Math.hypot(w0 + dx, h0 + dy) / Math.hypot(w0, h0));
+                    sx = k; sy = k;
+                } else {
+                    sx = Math.max(0.05, (b.w + selPointer.signX * dx) / (b.w || 1));
+                    sy = Math.max(0.05, (b.h + selPointer.signY * dy) / (b.h || 1));
+                }
+                for (const s of state.selection) scaleStrokeAbout(s, selPointer.anchorX, selPointer.anchorY, sx, sy);
+                renderAll();
+            }
+        } else if (selPointer.mode === 'imgscale') {
+            const dx = p.x - selPointer.lastX, dy = p.y - selPointer.lastY;
+            selPointer.lastX = p.x; selPointer.lastY = p.y;
+            const img = selPointer.img;
+            const cx = selPointer.anchorX, cy = selPointer.anchorY;
+            const diag = Math.max(1, Math.hypot(selPointer.w0, selPointer.h0));
+            const newDiag = Math.hypot(p.x - cx, p.y - cy);
+            let k = newDiag / diag;
+            k = Math.max(0.05, Math.min(25, k));
+            img.x = cx + (selPointer.x0 - cx) * k;
+            img.y = cy + (selPointer.y0 - cy) * k;
+            img.w = selPointer.w0 * k;
+            img.h = selPointer.h0 * k;
+            renderAll();
+        }
+        drawSelectionOverlay();
+    }
+    function boxSelectEnd(e) {
+        if (!selPointer || e.pointerId !== selPointer.id) return;
+        try { container.releasePointerCapture(e.pointerId); } catch (_) { }
+        const sp = selPointer;
+        selPointer = null;
+        state.selDrag = null;
+        container.classList.remove('cursor-grabbing-pan');
+        if (sp.mode === 'select') {
+            const r = sp.rect;
+            const sel = [];
+            for (const s of state.strokes) {
+                const b = computeStrokeBounds(s);
+                if (b && b.x < r.x + r.w && b.x + b.w > r.x && b.y < r.y + r.h && b.y + b.h > r.y) {
+                    sel.push(s);
+                }
+            }
+            state.selection = sel;
+        }
+        drawSelectionOverlay();
+    }
+    container.addEventListener('pointerdown', boxSelectDown);
+    container.addEventListener('pointermove', boxSelectMove);
+    container.addEventListener('pointerup', boxSelectEnd);
+    container.addEventListener('pointercancel', boxSelectEnd);
 
     if (typeof syncVideoLayout === 'function') syncVideoLayout();
+    if (typeof syncFunctionLayerToolState === 'function') syncFunctionLayerToolState();
 
     document.getElementById('prevPageBtn').addEventListener('click', () => {
         if (state.doublePageMode) { if (typeof doublePagePrev === 'function') doublePagePrev(); return; }

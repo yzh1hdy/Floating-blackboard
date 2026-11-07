@@ -1,5 +1,10 @@
 function saveCurrentPage() {
     if (!state.canvas) return;
+    // PPT 播放时：绘图页是独立的 PPT 分页，保存到对应 PPT 页，不写回白板页面
+    if (state.pptActive) {
+        if (state.pptPages) state.pptPages[state.pptCurrent] = state.strokes.slice();
+        return;
+    }
     if (state.doublePageMode) { saveDoublePageSpread(); return; }
     // 拷贝，避免后续编辑改动已存页
     state.pages[state.currentPage] = state.strokes.slice();
@@ -51,6 +56,7 @@ function addPage() {
     state.undoStack = [];
     state.erasingNow = new Set();
     if (typeof resetNormalScrollY === 'function') resetNormalScrollY();
+    if (typeof clearAllFunctionWidgets === 'function') clearAllFunctionWidgets();
     renderAll();
     updateUI();
 }
@@ -62,10 +68,16 @@ function goToPage(index) {
     saveCurrentPage();
     state.currentPage = index;
     loadPageVectors(state.currentPage);
+    if (typeof clearAllFunctionWidgets === 'function') clearAllFunctionWidgets();
     updateUI();
 }
 
 function updateUI() {
+    // PPT 批注模式：页码跟随真实幻灯片（pptCurrent/pptTotal 由 COM 页码消息驱动）
+    if (state.pptActive) {
+        // PPT 批注模式不显示白板原生翻页/页码控件；页码由 C# COM 驱动内部分页状态
+        return;
+    }
     if (state.doublePageMode) {
         // 双页模式：右侧为当前页(页面1)，左侧为下一页(页面2)，允许翻页
         pageIndicator.innerText = `${state.currentPage + 1}-${state.currentPage + 2}/${state.pages.length}`;
@@ -138,10 +150,18 @@ function executeClear() {
     // 动画结束后再清空像素，确保模糊渐隐可见
     const finishClear = function() {
         canvas.classList.remove('canvas-clear-animating');
-        state.strokes = [];
+        if (state.doublePageMode) {
+            // 双页模式：仅清空左侧页(pg=0)内容，保留右侧页(pg=1)
+            state.strokes = state.strokes.filter(s => s.pg === 1);
+        } else {
+            state.strokes = [];
+        }
+        // PPT 播放时同时清空当前 PPT 页的独立绘图页
+        if (state.pptActive && state.pptPages) state.pptPages[state.pptCurrent] = [];
         state.undoStack = [];
         state.erasingNow = new Set();
         if (typeof resetNormalScrollY === 'function') resetNormalScrollY();
+        if (typeof clearAllFunctionWidgets === 'function') clearAllFunctionWidgets();
         renderAll();
     };
 
@@ -252,6 +272,7 @@ function clearAllPages() {
     state.strokes = [];
     state.undoStack = [];
     state.erasingNow = new Set();
+    if (typeof clearAllFunctionWidgets === 'function') clearAllFunctionWidgets();
     if (state.ctx && state.canvas) {
         state.ctx.save();
         state.ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -270,8 +291,11 @@ function clearAllPages() {
 function doublePageOffsetX(pg) {
     return pg ? (window.innerWidth / 2) : 0;
 }
-function attachDoublePagePg(stroke) {
-    if (stroke && state.doublePageMode) stroke.pg = state.activeDoublePage;
+function attachDoublePagePg(stroke, pgOverride) {
+    if (stroke && state.doublePageMode) {
+        // 多点触控时各手指按落点归属自己的页（pgOverride）；未指定则沿用当前激活页
+        stroke.pg = (pgOverride !== undefined && pgOverride !== null) ? pgOverride : state.activeDoublePage;
+    }
     return stroke;
 }
 function stripPg(s) {
@@ -311,6 +335,8 @@ function translateStrokeX(s, ox) {
     } else if (s.tool === 'line' || s.tool === 'dashed') {
         s.x1 += ox;
         s.x2 += ox;
+    } else if (s.tool === 'image') {
+        s.x += ox;
     } else if (s.points && s.points.length) {
         for (const p of s.points) p.x += ox;
     }

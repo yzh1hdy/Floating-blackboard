@@ -1,16 +1,30 @@
-function toggleAutoCorrection() {
-    state.autoCorrectionEnabled = !state.autoCorrectionEnabled;
-    const switchEl = document.getElementById('autoCorrectionSwitch');
-    if (state.autoCorrectionEnabled) {
+function toggleBoxSelect() {
+    state.boxSelectEnabled = !state.boxSelectEnabled;
+    if (!state.boxSelectEnabled && typeof clearSelection === 'function') {
+        clearSelection();
+    }
+    updateBoxSelectSwitch();
+}
+
+function updateBoxSelectSwitch() {
+    const switchEl = document.getElementById('boxSelectSwitch');
+    if (!switchEl) return;
+    if (state.boxSelectEnabled) {
         switchEl.classList.add('active');
     } else {
         switchEl.classList.remove('active');
     }
 }
 
-function updateAutoCorrectionSwitch() {
-    const switchEl = document.getElementById('autoCorrectionSwitch');
-    if (state.autoCorrectionEnabled) {
+function toggleMultiFingerWrite() {
+    state.multiFingerWrite = !state.multiFingerWrite;
+    updateMultiFingerSwitch();
+}
+
+function updateMultiFingerSwitch() {
+    const switchEl = document.getElementById('multiFingerSwitch');
+    if (!switchEl) return;
+    if (state.multiFingerWrite) {
         switchEl.classList.add('active');
     } else {
         switchEl.classList.remove('active');
@@ -54,7 +68,7 @@ function startShapeDraw(shapeType) {
     container.style.cursor = 'crosshair';
 }
 
-function drawShapePreview(startX, startY, endX, endY) {
+function drawShapePreview(startX, startY, endX, endY, pgOverride) {
     if (!state.shapePreviewCtx) return;
 
     const ctx = state.shapePreviewCtx;
@@ -64,7 +78,10 @@ function drawShapePreview(startX, startY, endX, endY) {
     ctx.restore();
 
     ctx.save();
-    if (state.doublePageMode) ctx.translate(doublePageOffsetX(state.activeDoublePage), 0);
+    if (state.doublePageMode) {
+        const pg = (pgOverride !== undefined && pgOverride !== null) ? pgOverride : state.activeDoublePage;
+        ctx.translate(doublePageOffsetX(pg), 0);
+    }
 
     const startSnap = snapToCircle(startX, startY);
     if (startSnap.didSnap) {
@@ -185,7 +202,7 @@ function snapToCircle(x, y) {
     return { x: snappedX, y: snappedY, didSnap };
 }
 
-function finishShapeDraw(endX, endY) {
+function finishShapeDraw(endX, endY, pgOverride) {
     if (!state.shapeStartPoint) return;
 
     let startX = state.shapeStartPoint.x;
@@ -246,10 +263,14 @@ function finishShapeDraw(endX, endY) {
     }
 
     if (stroke) {
-        if (typeof attachDoublePagePg === 'function') attachDoublePagePg(stroke);
+        if (typeof attachDoublePagePg === 'function') attachDoublePagePg(stroke, pgOverride);
         state.strokes.push(stroke);
         pushUndo({ type: 'add', stroke: stroke });
-        renderAll();
+        if (typeof renderAllPreservingTouches === 'function') {
+            renderAllPreservingTouches();
+        } else {
+            renderAll();
+        }
     }
 
     if (state.shapePreviewCanvas && state.shapePreviewCtx) {
@@ -264,59 +285,22 @@ function finishShapeDraw(endX, endY) {
     container.style.cursor = state.tool === 'pen' ? 'crosshair' : 'auto';
 }
 
-function isCloseToLine(points, threshold) {
-    if (points.length < 2) return false;
-
-    const start = points[0];
-    const end = points[points.length - 1];
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const length = Math.sqrt(dx * dx + dy * dy);
-
-    if (length === 0) return false;
-
-    let maxDistance = 0;
-    for (let i = 1; i < points.length - 1; i++) {
-        const point = points[i];
-        const distance = Math.abs(dy * (point.x - start.x) - dx * (point.y - start.y)) / length;
-        maxDistance = Math.max(maxDistance, distance);
-    }
-
-    return maxDistance < threshold;
+function insertCoordinateShape(shapeType) {
+    if (!state.ctx || !state.strokes) return;
+    const w = window.innerWidth, h = window.innerHeight, size = h * 0.5;
+    const stroke = shapeType === 'coordinateSystem'
+        ? { tool: 'coordinateSystem', x: (w - size) / 2, y: (h - size) / 2, size, color: penConfig.currentColor, width: penConfig.currentSize }
+        : { tool: 'nonNegativeQuadrant', x: w / 2 - 300, y: h / 2 + 200, widthPx: 600, heightPx: 400, color: penConfig.currentColor, width: penConfig.currentSize };
+    state.strokes.push(stroke);
+    pushUndo({ type: 'add', stroke });
+    if (typeof renderAllPreservingTouches === 'function') renderAllPreservingTouches(); else renderAll();
 }
 
-function fitCircle(points) {
-    if (points.length < 3) return null;
-
-    let sumX = 0, sumY = 0;
-    for (const p of points) {
-        sumX += p.x;
-        sumY += p.y;
-    }
-    const centerX = sumX / points.length;
-    const centerY = sumY / points.length;
-
-    let sumRadius = 0;
-    for (const p of points) {
-        const dx = p.x - centerX;
-        const dy = p.y - centerY;
-        sumRadius += Math.sqrt(dx * dx + dy * dy);
-    }
-    const radius = sumRadius / points.length;
-
-    return { centerX, centerY, radius };
-}
-
-function isCloseToCircle(points, circle, threshold) {
-    for (const p of points) {
-        const dx = p.x - circle.centerX;
-        const dy = p.y - circle.centerY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        if (Math.abs(distance - circle.radius) > threshold) {
-            return false;
-        }
-    }
-    return true;
+function drawArrow(ctx, x1, y1, x2, y2, scale) {
+    const a = Math.atan2(y2 - y1, x2 - x1), n = Math.max(8, 10 / scale);
+    ctx.beginPath(); ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - n * Math.cos(a - Math.PI / 6), y2 - n * Math.sin(a - Math.PI / 6));
+    ctx.moveTo(x2, y2); ctx.lineTo(x2 - n * Math.cos(a + Math.PI / 6), y2 - n * Math.sin(a + Math.PI / 6)); ctx.stroke();
 }
 
 function drawLine(x1, y1, x2, y2, isDashed = false) {
@@ -350,47 +334,5 @@ function drawCircle(centerX, centerY, radius) {
     state.ctx.beginPath();
     state.ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
     state.ctx.stroke();
-}
-
-// 分析手绘点列：符合直线/圆则返回对应矢量描述，否则返回 null；不直接绘制，由调用方提交
-function analyzeAndConvertStroke(points) {
-    if (!state.autoCorrectionEnabled) return null;
-    if (points.length < 3) return null;
-
-    const start = points[0];
-    const end = points[points.length - 1];
-    const length = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
-
-    if (length > 160) {
-        const isLine = isCloseToLine(points, 15);
-        if (isLine) {
-            return {
-                tool: 'line',
-                x1: start.x,
-                y1: start.y,
-                x2: end.x,
-                y2: end.y,
-                color: penConfig.currentColor,
-                width: penConfig.currentSize
-            };
-        }
-    }
-
-    const circle = fitCircle(points);
-    if (circle && circle.radius > 120) {
-        const isCircle = isCloseToCircle(points, circle, 80);
-        if (isCircle) {
-            return {
-                tool: 'circle',
-                cx: circle.centerX,
-                cy: circle.centerY,
-                r: circle.radius,
-                color: penConfig.currentColor,
-                width: penConfig.currentSize
-            };
-        }
-    }
-
-    return null;
 }
 
