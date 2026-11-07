@@ -36,7 +36,7 @@ namespace _01
         FEEDBACK_PEN_DRAG = 12,
     }
 
-    public partial class FloatTimerForm : Form
+    public partial class FloatTimerForm : Form, IMessageFilter
     {
         private readonly string imgExpand;
         private readonly string imgTrayIcon;
@@ -61,6 +61,7 @@ namespace _01
         // 外部信号监听：重复启动带 --video 参数时打开 html 视频模式
         private EventWaitHandle? _openVideoSignal;
         private volatile bool _signalThreadRunning;
+        // 澶栭儴淇″彿鐩戝惉锛氶噸澶嶅惎鍔ㄥ甫 .pptx 鍙傛暟鏃堕€氱煡鍘熻繘绋嬫墦寮€ PPT 鎾斁
 
         // 退出验证（托盘退出时的 0721 手写验证）相关
         private Form verifyLayer;
@@ -84,9 +85,34 @@ namespace _01
         // 鼠标穿透相关：工具栏豁免区（屏幕坐标）、命中测试常量与子类化回调
         private const int WM_NCHITTEST = 0x0084;
         private const int HTTRANSPARENT = -1;
-        private Rectangle _toolbarScreenRect;
-        private Form? _toolbarInputOverlay;
+        // 翻页模式起，透明模式下可能同时有主工具栏 + 左下/右下翻页工具栏共三个可点击区，
+        // 因此把单窗口/单矩形扩展为列表：_toolbarScreenRects 记录各工具栏屏幕坐标，
+        // _toolbarInputOverlays 为对应每个工具栏独立创建的点击接收覆盖窗（互不抢置顶）。
+        private readonly List<Rectangle> _toolbarScreenRects = new List<Rectangle>();
+        private readonly List<Form> _toolbarInputOverlays = new List<Form>();
         private static FloatTimerForm? _passthroughOwner;
+
+        // 翻页模式（透明模式下检测 powerpnt/easinote 运行后启用）：
+        // _transparentMode 由 HTML 上报；_pageTurnActive 为当前是否已向 HTML 下发启用
+        private bool _transparentMode;
+        private bool _pageTurnActive;
+        // 是否希沃白板(easinote)窗口打开：决定翻页工具栏是否向中间主工具栏靠拢
+        private bool _pageTurnSeewo;
+        private System.Windows.Forms.Timer? _pageTurnCheckTimer;
+        private PageTurnApp _lastDetectedApp = PageTurnApp.None;
+
+        // PowerPoint COM 自动化（晚期绑定，不引用 PIA）：读取放映页码并调用 View.Next/Previous/Exit
+        private object? _pptComApp;
+        private bool _pptShowActive;
+        private int _lastPptSlideIndex;
+        private int _lastPptSlideTotal;
+        // 上一次下发给 HTML 的 PPT 批注模式状态（enabled/seewo），仅变化时推送
+        private bool _lastPptModeEnabled;
+        private bool _lastPptModeSeewo;
+        // 白板收起（隐藏）状态下检测到 PowerPoint 放映时自动展开批注功能，只触发一次
+        private bool _autoOpenedForPpt;
+        // PPT 左/右翻页按钮按下后的一次性页码补查定时器：COM Next/Previous 后索引可能滞后于定时轮询
+        private System.Windows.Forms.Timer? _pptSlideRefreshTimer;
         // 鼠标穿透开启前记录的下层前台窗口，穿透开启后把焦点交还给它
         private IntPtr _previousForegroundWindow = IntPtr.Zero;
         private readonly List<IntPtr> _subclassedWindows = new List<IntPtr>();
@@ -193,26 +219,28 @@ namespace _01
 
             #region 6. 焦点检查定时器
             focusCheckTimer = new System.Windows.Forms.Timer { Interval = 100 };
-            focusCheckTimer.Tick += (_, _) =>
-            {
-                // 鼠标穿透模式下不抢焦点，保证点击能穿透到下层窗��
-                if (_passthroughActive) return;
-
-                if (webLayer != null && !webLayer.IsDisposed && webLayer.Visible)
-                {
-                    IntPtr fgWindow = GetForegroundWindow();
-                    if (fgWindow != webLayer.Handle && fgWindow != btnForm.Handle && fgWindow != this.Handle)
-                    {
-                        GetCursorPos(out POINT cursorPos);
-                        Rectangle webLayerRect = new Rectangle(webLayer.Location, webLayer.Size);
-                        if (webLayerRect.Contains(cursorPos.X, cursorPos.Y))
-                        {
-                            ForceWindowToFront(webLayer.Handle);
-                        }
-                    }
-                }
-            };
+            // Focus state machine: AssertFocusState keeps focus aligned with the passthrough state:
+            //   1) Not passthrough (normal non-transparent mode / transparent + non-mouse tool): focus on webview whiteboard;
+            //   2) Passthrough (transparent + mouse tool): focus always stays on the underlying window.
+            focusCheckTimer.Tick += (_, _) => AssertFocusState();
             focusCheckTimer.Start();
+
+            Application.AddMessageFilter(this);
+
+            #region 翻页模式进程检测定时器（透明模式下检测 powerpnt/easinote 运行）
+            _pageTurnCheckTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+            _pageTurnCheckTimer.Tick += (_, _) => UpdatePageTurnMode();
+            _pageTurnCheckTimer.Start();
+
+            // PPT 翻页按钮动作后的一次性页码补查：先立即探测一次，再延时 160ms 复探一次，
+            // 覆盖 COM 翻页动画期间 SlideIndex 尚未刷新的窗口
+            _pptSlideRefreshTimer = new System.Windows.Forms.Timer { Interval = 160 };
+            _pptSlideRefreshTimer.Tick += (_, _) =>
+            {
+                try { PollPowerPointShow(); } catch { }
+            };
+            _pptSlideRefreshTimer.Stop();
+            #endregion
             #endregion
 
             #region 7. 设置程序基础优先级（非性能模式时也会设置）
@@ -255,7 +283,7 @@ namespace _01
         {
             await Task.Delay(3500);
 
-            if (IsDisposed || expanded)
+            if (IsDisposed || expanded || _autoOpenedForPpt)
             {
                 return;
             }
@@ -264,7 +292,9 @@ namespace _01
 
             await Task.Delay(800);
 
-            if (!IsDisposed && expanded)
+            // 若这 800ms 内检测到 PowerPoint 放映并已自动展开批注，则不再自动收起白板
+            if (!IsDisposed && expanded && !_autoOpenedForPpt &&
+                _lastDetectedApp != PageTurnApp.PowerPoint && !_pptShowActive)
             {
                 Toggle();
             }
@@ -385,6 +415,7 @@ namespace _01
             _openVideoSignal = null;
         }
         #endregion
+
 
         #region 配置管理
         private void LoadConfig()
@@ -1008,11 +1039,19 @@ namespace _01
         private void CleanupResources()
         {
             StopOpenVideoSignalListener();
+            ReleasePptComObject();
+
+            Application.RemoveMessageFilter(this);
 
             topMostTimer?.Stop();
             topMostTimer?.Dispose();
             focusCheckTimer?.Stop();
             focusCheckTimer?.Dispose();
+
+            _pageTurnCheckTimer?.Stop();
+            _pageTurnCheckTimer?.Dispose();
+            _pptSlideRefreshTimer?.Stop();
+            _pptSlideRefreshTimer?.Dispose();
 
             _memoryKeepAliveTimer?.Stop();
             _memoryKeepAliveTimer?.Dispose();
@@ -1127,7 +1166,7 @@ namespace _01
                     this.Invoke(new Action(() =>
                     {
                         // 隐藏白板时同步关闭鼠标穿透
-                        SetMousePassthrough(false, Rectangle.Empty);
+                        SetMousePassthrough(false, new List<Rectangle>());
                         if (expanded)
                         {
                             expanded = false;
@@ -1146,7 +1185,8 @@ namespace _01
             catch { }
         }
 
-        // 处理来自HTML的JSON消息（支持：setMousePassthrough 鼠标穿透；savePhoto/listPhotos/clearAlbum 相册）
+        // 处理来自HTML的JSON消息（支持：setMousePassthrough 鼠标穿透；setTransparentMode 透明模式；
+        // pageTurnAction 翻页按键；savePhoto/listPhotos/clearAlbum 相册）
         private void HandleHostMessage(string json)
         {
             try
@@ -1155,54 +1195,114 @@ namespace _01
                 var root = doc.RootElement;
                 if (!root.TryGetProperty("type", out var typeProp)) return;
                 string messageType = typeProp.GetString() ?? "";
-                // 相册相关消息交由专门处理，鼠标穿透逻辑保持原样
-                if (messageType != "setMousePassthrough")
+
+                if (messageType == "setMousePassthrough")
                 {
+                    HandleMousePassthroughMessage(root);
+                }
+                else if (messageType == "setTransparentMode")
+                {
+                    bool enabled = root.TryGetProperty("enabled", out var tProp) && tProp.GetBoolean();
+                    this.Invoke(new Action(() =>
+                    {
+                        _transparentMode = enabled;
+                        if (enabled)
+                        {
+                            // 进入透明模式时强制重发批注/翻页状态：此前非透明（含收起态前端守卫）
+                            // 可能已置位去重标记，导致进入信号被跳过、前端不进批注态
+                            _lastPptModeEnabled = false;
+                            _lastPptModeSeewo = false;
+                            _pageTurnActive = false;
+                            _pageTurnSeewo = false;
+                        }
+                        UpdatePageTurnMode();
+                    }));
+                }
+                else if (messageType == "pageTurnAction")
+                {
+                    string action = root.TryGetProperty("action", out var aProp)
+                        ? (aProp.GetString() ?? "") : "";
+                    this.Invoke(new Action(() => HandlePageTurnAction(action)));
+                }
+                else
+                {
+                    // 相册相关消息交由专门处理
                     HandleAlbumMessage(messageType, root);
-                    return;
                 }
-                if (messageType != "setMousePassthrough") return;
-
-                bool enabled = root.TryGetProperty("enabled", out var enabledProp) && enabledProp.GetBoolean();
-
-                // 工具栏豁免区（CSS像素 → 物理像素）：JS端同时上报 devicePixelRatio
-                Rectangle toolbarRect = Rectangle.Empty;
-                if (enabled && root.TryGetProperty("toolbar", out var toolbarProp))
-                {
-                    double scale = 1.0;
-                    if (root.TryGetProperty("dpr", out var dprProp)) scale = dprProp.GetDouble();
-                    int x = (int)Math.Round(toolbarProp.GetProperty("x").GetDouble() * scale);
-                    int y = (int)Math.Round(toolbarProp.GetProperty("y").GetDouble() * scale);
-                    int w = (int)Math.Round(toolbarProp.GetProperty("width").GetDouble() * scale);
-                    int h = (int)Math.Round(toolbarProp.GetProperty("height").GetDouble() * scale);
-                    toolbarRect = new Rectangle(x, y, w, h);
-                }
-
-                this.Invoke(new Action(() => SetMousePassthrough(enabled, toolbarRect)));
             }
             catch { }
         }
 
-        // 设置鼠标穿透：开启后拦截 WebView 窗口的命中测试，除工具栏豁免区外全部点击穿透
-        private void SetMousePassthrough(bool enabled, Rectangle toolbarRect)
+        // 解析 setMousePassthrough：读取 dpr、toolbar（兼容旧版）、toolbars（多个工具栏）并设置穿透
+        private void HandleMousePassthroughMessage(JsonElement root)
+        {
+            bool enabled = root.TryGetProperty("enabled", out var enabledProp) && enabledProp.GetBoolean();
+            var rects = new List<Rectangle>();
+            if (enabled)
+            {
+                // 工具栏豁免区（CSS像素 → 物理像素）：JS端同时上报 devicePixelRatio
+                double scale = 1.0;
+                if (root.TryGetProperty("dpr", out var dprProp)) scale = dprProp.GetDouble();
+
+                if (root.TryGetProperty("toolbars", out var toolbarsProp) &&
+                    toolbarsProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var t in toolbarsProp.EnumerateArray())
+                    {
+                        Rectangle r = ParseToolbarRect(t, scale);
+                        if (r.Width > 0 && r.Height > 0) rects.Add(r);
+                    }
+                }
+                // 兼容旧版只上报单工具栏的情况
+                if (rects.Count == 0 && root.TryGetProperty("toolbar", out var toolbarProp))
+                {
+                    Rectangle r = ParseToolbarRect(toolbarProp, scale);
+                    if (r.Width > 0 && r.Height > 0) rects.Add(r);
+                }
+            }
+            var list = rects;
+            this.Invoke(new Action(() => SetMousePassthrough(enabled, list)));
+        }
+
+        private static Rectangle ParseToolbarRect(JsonElement t, double scale)
+        {
+            try
+            {
+                int x = (int)Math.Round(t.GetProperty("x").GetDouble() * scale);
+                int y = (int)Math.Round(t.GetProperty("y").GetDouble() * scale);
+                int w = (int)Math.Round(t.GetProperty("width").GetDouble() * scale);
+                int h = (int)Math.Round(t.GetProperty("height").GetDouble() * scale);
+                return new Rectangle(x, y, w, h);
+            }
+            catch { return Rectangle.Empty; }
+        }
+
+        // 设置鼠标穿透：开启后拦截 WebView 窗口的命中测试，除各工具栏豁免区外全部点击穿透。
+        // toolbarRects 为各工具栏屏幕坐标列表（主工具栏 + 左下/右下翻页工具栏）。
+        private void SetMousePassthrough(bool enabled, List<Rectangle> toolbarRects)
         {
             _passthroughActive = enabled;
             _passthroughOwner = enabled ? this : null;
 
             if (enabled && webLayer != null && !webLayer.IsDisposed)
             {
-                // HTML 上报的是 WebView 视口坐标，转换成屏幕坐标后创建独立的点击接收窗。
-                toolbarRect.Offset(webLayer.Left, webLayer.Top);
-                _toolbarScreenRect = toolbarRect;
+                // HTML 上报的是 WebView 视口坐标，转换成屏幕坐标后为每个工具栏创建独立的点击接收窗。
+                _toolbarScreenRects.Clear();
+                foreach (var r in toolbarRects)
+                {
+                    var sr = r;
+                    sr.Offset(webLayer.Left, webLayer.Top);
+                    if (sr.Width > 0 && sr.Height > 0) _toolbarScreenRects.Add(sr);
+                }
                 SetClickThroughStyle(webLayer.Handle, true);
-                CreateToolbarInputOverlay();
+                CreateToolbarInputOverlays();
                 // 穿透开启后，让白板/WebView 让出焦点，焦点交给下层的程序
                 ReleaseWebLayerFocus();
             }
             else
             {
-                _toolbarScreenRect = Rectangle.Empty;
-                RemoveToolbarInputOverlay();
+                _toolbarScreenRects.Clear();
+                RemoveToolbarInputOverlays();
                 if (webLayer != null && !webLayer.IsDisposed)
                 {
                     SetClickThroughStyle(webLayer.Handle, false);
@@ -1211,12 +1311,82 @@ namespace _01
             }
 
             Debug.WriteLine(enabled
-                ? $"鼠标穿透已开启，工具栏由独立覆盖窗接收: {_toolbarScreenRect}"
+                ? $"鼠标穿透已开启，工具栏由独立覆盖窗接收({_toolbarScreenRects.Count}个): {string.Join(";", _toolbarScreenRects)}"
                 : "鼠标穿透已关闭");
         }
 
         #region 焦点交接（鼠标穿透时把焦点交给下层程序）
         // 记录被本程序抢走焦点前的下层前台窗口，穿透开启时用其交还焦点
+        // Focus state machine: invoked by focusCheckTimer every 100ms to keep focus aligned with:
+        //   1) Not passthrough (normal mode / transparent + non-mouse tool): focus stays on webview;
+        //   2) Passthrough (transparent + mouse tool): focus always goes to the underlying window.
+        private void AssertFocusState()
+        {
+            if (webLayer == null || webLayer.IsDisposed || !webLayer.Visible) return;
+            if (webView == null || webView.IsDisposed) return;
+
+            IntPtr fgWindow = GetForegroundWindow();
+
+            // 透明 + 鼠标工具（穿透开启）：无论前台窗口是谁（包括白板自身），
+            // 焦点都必须交给下层窗口，保证"任何时候选中鼠标工具，焦点都在下层窗口"。
+            if (_passthroughActive)
+            {
+                if (fgWindow == IntPtr.Zero) return;
+                if (IsOwnWindow(fgWindow))
+                {
+                    ReleaseWebLayerFocus();
+                }
+                else
+                {
+                    // 记住最近一个持有焦点的外部窗口，作为交还焦点的目标
+                    _previousForegroundWindow = fgWindow;
+                }
+                return;
+            }
+
+            // 非穿透（普通模式 / 透明 + 非鼠标工具）：焦点必须保持在白板 WebView 上。
+            if (fgWindow == webLayer.Handle)
+            {
+                // 窗口已在前台，但还需确保键盘焦点真正落在 WebView 控件上（而非白板空窗体）
+                EnsureWebViewFocused();
+                return;
+            }
+
+            // 前台是其他窗口：仅当鼠标位于白板区域内（用户正在使用白板），
+            // 或焦点被本程序自己的窗口（按钮/动画层等）占用时，才把焦点收回白板，
+            // 避免在多显示器等场景下打扰用户操作其他程序。
+            GetCursorPos(out POINT cursorPos);
+            Rectangle webLayerRect = new Rectangle(webLayer.Location, webLayer.Size);
+            bool cursorOverWhiteboard = webLayerRect.Contains(cursorPos.X, cursorPos.Y);
+            bool focusOnOwnWindow = fgWindow != IntPtr.Zero && IsOwnWindow(fgWindow);
+            if (!cursorOverWhiteboard && !focusOnOwnWindow) return;
+
+            ForceFocusToWebLayer();
+        }
+
+        // 把前台切到白板，并确保 WebView 控件拿到键盘焦点
+        private void ForceFocusToWebLayer()
+        {
+            if (webLayer == null || webLayer.IsDisposed || !webLayer.Visible) return;
+            ForceWindowToFront(webLayer.Handle);
+            EnsureWebViewFocused();
+        }
+
+        // 确保键盘焦点落在 WebView 控件上（仅非穿透模式调用，避免破坏穿透点击）
+        private void EnsureWebViewFocused()
+        {
+            if (_passthroughActive) return;
+            if (webView == null || webView.IsDisposed) return;
+            try
+            {
+                if (!webView.Focused)
+                {
+                    webView.Focus();
+                }
+            }
+            catch { }
+        }
+
         private void CapturePreviousForeground()
         {
             IntPtr fg = GetForegroundWindow();
@@ -1232,7 +1402,8 @@ namespace _01
             IntPtr target = IntPtr.Zero;
             if (_previousForegroundWindow != IntPtr.Zero &&
                 IsWindow(_previousForegroundWindow) &&
-                IsWindowVisible(_previousForegroundWindow))
+                IsWindowVisible(_previousForegroundWindow) &&
+                !IsOwnWindow(_previousForegroundWindow))
             {
                 target = _previousForegroundWindow;
             }
@@ -1303,69 +1474,80 @@ namespace _01
             if (btnForm != null && h == btnForm.Handle) return true;
             if (webLayer != null && h == webLayer.Handle) return true;
             if (animationLayer != null && h == animationLayer.Handle) return true;
-            if (_toolbarInputOverlay != null && h == _toolbarInputOverlay.Handle) return true;
+            if (_toolbarInputOverlays.Any(o => !o.IsDisposed && h == o.Handle)) return true;
             return false;
         }
         #endregion
 
-        private void CreateToolbarInputOverlay()
+        // 为每个工具栏（主工具栏 + 左下/右下翻页工具栏）创建独立的点击接收覆盖窗。
+        // 各覆盖窗在创建时一次性置顶并按固定顺序叠放，不在定时器里重复抢置顶，
+        // 因此三个窗口之间互不抢占 Z 序；覆盖窗之间互不重叠，层级顺序不影响使用。
+        private void CreateToolbarInputOverlays()
         {
-            RemoveToolbarInputOverlay();
-            if (_toolbarScreenRect.Width <= 0 || _toolbarScreenRect.Height <= 0) return;
+            RemoveToolbarInputOverlays();
+            if (_toolbarScreenRects.Count == 0) return;
 
-            _toolbarInputOverlay = new Form
+            foreach (var rect in _toolbarScreenRects)
             {
-                FormBorderStyle = FormBorderStyle.None,
-                ShowInTaskbar = false,
-                ShowIcon = false,
-                TopMost = true,
-                StartPosition = FormStartPosition.Manual,
-                Bounds = _toolbarScreenRect,
-                // 不能使用 TransparencyKey：被抠掉的区域会连同鼠标命中一起透明。
-                // 使用极低不透明度保留真实窗口命中，同时视觉上不可见。
-                BackColor = Color.Black,
-                Opacity = 0.01,
-                Text = ""
-            };
-            SetToolWindow(_toolbarInputOverlay.Handle);
-            SetWindowLong(_toolbarInputOverlay.Handle, GWL_EXSTYLE,
-                GetWindowLong(_toolbarInputOverlay.Handle, GWL_EXSTYLE) | 0x08000000);
+                var overlay = new Form
+                {
+                    FormBorderStyle = FormBorderStyle.None,
+                    ShowInTaskbar = false,
+                    ShowIcon = false,
+                    TopMost = true,
+                    StartPosition = FormStartPosition.Manual,
+                    Bounds = rect,
+                    BackColor = Color.Black,
+                    Opacity = 0.005,
+                    Text = ""
+                };
+                SetToolWindow(overlay.Handle);
+                SetWindowLong(overlay.Handle, GWL_EXSTYLE,
+                    GetWindowLong(overlay.Handle, GWL_EXSTYLE) | 0x08000000);
 
-            _toolbarInputOverlay.MouseDown += (_, e) => ForwardPassthroughPointer("down", e);
-            _toolbarInputOverlay.MouseMove += (_, e) => ForwardPassthroughPointer("move", e);
-            _toolbarInputOverlay.MouseUp += (_, e) => ForwardPassthroughPointer("up", e);
-            // 不设置 owner，避免 owner 的层级/激活状态把覆盖窗压到 WebView 后面。
-            _toolbarInputOverlay.Show();
-            SetWindowPos(_toolbarInputOverlay.Handle, HWND_TOPMOST, 0, 0, 0, 0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                overlay.MouseDown += (_, e) => ForwardPassthroughPointer("down", overlay, e);
+                overlay.MouseMove += (_, e) => ForwardPassthroughPointer("move", overlay, e);
+                overlay.MouseUp += (_, e) => ForwardPassthroughPointer("up", overlay, e);
+                // 不设置 owner，避免 owner 的层级/激活状态把覆盖窗压到 WebView 后面。
+                overlay.Show();
+                SetWindowPos(overlay.Handle, HWND_TOPMOST, 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                _toolbarInputOverlays.Add(overlay);
+            }
         }
 
-        private void RemoveToolbarInputOverlay()
+        private void RemoveToolbarInputOverlays()
         {
-            if (_toolbarInputOverlay == null) return;
-            var overlay = _toolbarInputOverlay;
-            _toolbarInputOverlay = null;
-            if (!overlay.IsDisposed) overlay.Close();
-            overlay.Dispose();
+            foreach (var overlay in _toolbarInputOverlays)
+            {
+                try
+                {
+                    if (!overlay.IsDisposed) overlay.Close();
+                    overlay.Dispose();
+                }
+                catch { }
+            }
+            _toolbarInputOverlays.Clear();
         }
 
-        private void ForwardPassthroughPointer(string action, MouseEventArgs e)
+        private void ForwardPassthroughPointer(string action, Form overlay, MouseEventArgs e)
         {
             if (!_passthroughActive || webView?.CoreWebView2 == null || webLayer == null) return;
+            if (overlay == null || overlay.IsDisposed) return;
 
             // 【修复】快速点击时 MouseUp 可能在覆盖窗外释放而丢失，
             // 导致 JS 端永远收不到 up，工具栏点击状态卡死。
             // 在 down 时捕获鼠标到覆盖窗，确保 up 一定被转发。
-            if (action == "down" && _toolbarInputOverlay != null && !_toolbarInputOverlay.IsDisposed)
+            if (action == "down")
             {
-                _toolbarInputOverlay.Capture = true;
+                overlay.Capture = true;
             }
-            else if (action == "up" && _toolbarInputOverlay != null && !_toolbarInputOverlay.IsDisposed)
+            else if (action == "up")
             {
-                _toolbarInputOverlay.Capture = false;
+                overlay.Capture = false;
             }
 
-            Point screenPoint = _toolbarInputOverlay?.PointToScreen(e.Location) ?? Cursor.Position;
+            Point screenPoint = overlay.PointToScreen(e.Location);
             var payload = new
             {
                 type = "passthroughPointer",
@@ -1392,7 +1574,7 @@ namespace _01
                 // lParam 低位字 = 屏幕X，高位字 = 屏幕Y
                 int x = (short)(lParam.ToInt64() & 0xFFFF);
                 int y = (short)((lParam.ToInt64() >> 16) & 0xFFFF);
-                if (!owner._toolbarScreenRect.Contains(x, y))
+                if (!IsInsideAnyToolbarRect(owner, x, y))
                 {
                     return new IntPtr(HTTRANSPARENT);
                 }
@@ -1482,6 +1664,748 @@ namespace _01
             }
             _subclassedWindows.Clear();
         }
+        #endregion
+
+        #region 翻页模式（透明模式下检测 powerpnt/easinote 运行）
+        // 判断屏幕坐标是否落在任一工具栏豁免区（主工具栏 + 左下/右下翻页工具栏）
+        private static bool IsInsideAnyToolbarRect(FloatTimerForm owner, int x, int y)
+        {
+            foreach (var r in owner._toolbarScreenRects)
+            {
+                if (r.Contains(x, y)) return true;
+            }
+            return false;
+        }
+
+        // 翻页目标程序类型：None=无；PowerPoint=仅 PPT 运行；EasiNote=希沃白板窗口已打开
+        private enum PageTurnApp { None, PowerPoint, EasiNote }
+
+        // 检测 powerpnt.exe / easinote.exe 是否在运行（翻页模式）
+        // 1) 进程名用忽略大小写比较：Process.ProcessName 返回的是磁盘上 exe 的原样大小写
+        //    （如 PowerPoint 为 POWERPNT，希沃可能为 EasiNote 等），原 == 比较会漏判导致检测无效。
+        // 2) 希沃白板（easinote）要求存在实际窗口（MainWindowHandle != 0）才视为正在使用，
+        //    避免其仅以后台进程运行（无窗口）时也误触发 HTML 翻页模式。
+        // 3) 希沃白板窗口打开时优先返回 EasiNote（即使 PPT 同时运行），供 HTML 据此把
+        //    左下/右下翻页工具栏向屏幕中间主工具栏靠拢，避开希沃自身的边角工具。
+        private static PageTurnApp DetectPageTurnApp()
+        {
+            bool ppt = false;
+
+            // 一次性采集当前所有进程，避免循环内反复枚举
+            List<Process> procs = new List<Process>();
+            foreach (var p in Process.GetProcesses())
+            {
+                try { procs.Add(p); } catch { }
+            }
+
+            // 采集一次 父进程ID -> 子进程PID 映射，供 PPT 检测其子进程的全屏窗口
+            var children = BuildChildProcessMap();
+
+            foreach (var p in procs)
+            {
+                try
+                {
+                    string name = p.ProcessName;
+                    if (string.Equals(name, "easinote", StringComparison.OrdinalIgnoreCase))
+                    {
+                        p.Refresh(); // 刷新缓存，确保拿到当前的主窗口句柄
+                        if (p.MainWindowHandle != IntPtr.Zero)
+                        {
+                            return PageTurnApp.EasiNote; // 希沃白板：存在实际窗口，优先返回
+                        }
+                    }
+                    else if (string.Equals(name, "powerpnt", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // PowerPoint：仅当自身或其子进程存在全屏窗口才视为运行
+                        if (ProcessOrChildrenHasFullscreenWindow(p, children))
+                        {
+                            ppt = true;
+                        }
+                    }
+                }
+                catch { }
+            }
+            return ppt ? PageTurnApp.PowerPoint : PageTurnApp.None;
+        }
+
+        // 采集所有进程的 父进程ID -> 子进程PID 列表（用进程快照实现，无需额外引用 System.Management）
+        private static Dictionary<int, List<int>> BuildChildProcessMap()
+        {
+            var map = new Dictionary<int, List<int>>();
+            IntPtr snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+            if (snap == IntPtr.Zero) return map;
+            try
+            {
+                PROCESSENTRY32 entry = new PROCESSENTRY32 { dwSize = (uint)Marshal.SizeOf(typeof(PROCESSENTRY32)) };
+                if (Process32First(snap, ref entry))
+                {
+                    do
+                    {
+                        int ppid = (int)entry.th32ParentProcessID;
+                        int pid = (int)entry.th32ProcessID;
+                        if (!map.TryGetValue(ppid, out var list))
+                        {
+                            list = new List<int>();
+                            map[ppid] = list;
+                        }
+                        list.Add(pid);
+                    } while (Process32Next(snap, ref entry));
+                }
+            }
+            catch { }
+            finally
+            {
+                CloseHandle(snap);
+            }
+            return map;
+        }
+
+        // 判断进程自身或其任一直接子进程是否拥有一个全屏可见窗口
+        private static bool ProcessOrChildrenHasFullscreenWindow(Process p, Dictionary<int, List<int>> children)
+        {
+            if (ProcessHasFullscreenWindow(p)) return true;
+
+            if (children != null && children.TryGetValue(p.Id, out var childPids))
+            {
+                foreach (int cpid in childPids)
+                {
+                    try
+                    {
+                        using (var child = Process.GetProcessById(cpid))
+                        {
+                            if (ProcessHasFullscreenWindow(child)) return true;
+                        }
+                    }
+                    catch { } // 子进程可能已在采集后退出
+                }
+            }
+            return false;
+        }
+
+        // 枚举指定进程拥有的全部顶层窗口，只要其中任一可见窗口为全屏即视为命中
+        private static bool ProcessHasFullscreenWindow(Process p)
+        {
+            bool hasFullscreen = false;
+            uint targetPid = (uint)p.Id;
+            EnumWindows((hWnd, lParam) =>
+            {
+                uint wndPid;
+                GetWindowThreadProcessId(hWnd, out wndPid);
+                if (wndPid == targetPid && IsWindowVisible(hWnd) && IsWindowFullscreen(hWnd))
+                {
+                    hasFullscreen = true;
+                    return false; // 找到即停止枚举
+                }
+                return true;
+            }, IntPtr.Zero);
+            return hasFullscreen;
+        }
+
+        // 判断窗口是否真正"全屏"：铺满其所在屏幕，且无标题栏（排除最大化带标题栏的编辑窗口）
+        private static bool IsWindowFullscreen(IntPtr hWnd)
+        {
+            RECT r;
+            if (!GetWindowRect(hWnd, out r)) return false;
+            int w = r.Right - r.Left;
+            int h = r.Bottom - r.Top;
+            Screen scr = Screen.FromHandle(hWnd);
+            Rectangle sb = scr.Bounds;
+            if (Math.Abs(w - sb.Width) > 2 || Math.Abs(h - sb.Height) > 2) return false;
+            if (r.Left > sb.Left || r.Top > sb.Top) return false;
+            // 真正的全屏（如 PPT 放映窗口）通常是无标题栏的弹出窗口；最大化窗口带标题栏，应排除
+            int style = GetWindowLong(hWnd, GWL_STYLE);
+            return (style & (int)WS_CAPTION) == 0;
+        }
+
+        // 依据 透明模式 && 目标程序运行 计算应启用翻页，状态变化时通知 HTML（pageTurnMode）
+        // 同时把希沃白板是否打开（seewo）一并下发，HTML 据此调整翻页工具栏的位置。
+        private void UpdatePageTurnMode()
+        {
+            // 白板已展开但处于非透明普通白板时，不检测 PowerPoint/希沃：进程扫描与 COM 轮询
+            // 全部跳过，并复位可能残留的翻页/批注状态，通知前端退出批注态。
+            // 白板收起（仅显示展开按钮）时不跳过：保留检测，以便发现 PPT 放映后自动展开并进入透明批注。
+            if (expanded && !_transparentMode)
+            {
+                ResetPageTurnAndPptState();
+                return;
+            }
+
+            var app = DetectPageTurnApp();
+            _lastDetectedApp = app;
+
+            // COM 轮询 PowerPoint 放映状态与页码
+            PollPowerPointShow();
+
+            // PPT 批注目标：进程检测到 PowerPoint，或 COM 确认放映窗口存在
+            bool pptTarget = app == PageTurnApp.PowerPoint || _pptShowActive;
+            bool seewo = app == PageTurnApp.EasiNote;
+
+            // 白板收起（隐藏）状态下检测到 PowerPoint 放映：自动展开白板并启动叠加批注
+            if (pptTarget && !expanded && !_autoOpenedForPpt)
+            {
+                _autoOpenedForPpt = true;
+                try { Toggle(); } catch { }
+            }
+            if (!pptTarget) _autoOpenedForPpt = false;
+
+            // 已展开且处于 PPT 目标：自动调用 HTML toggleTransparentMode() 开启透明叠加批注；
+            // 收起态检测到目标并自动展开后，靠这里把 HTML 切到透明模式
+            if (pptTarget && expanded) EnsureTransparentForPpt();
+
+            // 独立下发 PPT 批注模式状态，前端据此进入/退出批注态、替换按钮图标
+            if (pptTarget != _lastPptModeEnabled || seewo != _lastPptModeSeewo)
+            {
+                _lastPptModeEnabled = pptTarget;
+                _lastPptModeSeewo = seewo;
+                PostPptModeMessage(pptTarget && !seewo, seewo, _lastPptSlideTotal);
+            }
+
+            // 翻页工具栏：透明模式且有目标程序，或 COM 已确认放映窗口时显示
+            bool desired = (app != PageTurnApp.None) || _pptShowActive;
+            if (desired == _pageTurnActive && seewo == _pageTurnSeewo) return;
+            _pageTurnActive = desired;
+            _pageTurnSeewo = seewo;
+
+            if (webView?.CoreWebView2 == null) return;
+            var json = JsonSerializer.Serialize(new { type = "pageTurnMode", enabled = desired, seewo = seewo });
+            try { webView.CoreWebView2.PostWebMessageAsJson(json); }
+            catch { }
+        }
+
+        // 复位翻页/PPT 批注全部状态并通知前端退出；用于非透明模式（不再检测）或目标消失。
+        private void ResetPageTurnAndPptState()
+        {
+            _lastDetectedApp = PageTurnApp.None;
+
+            if (_pptShowActive)
+            {
+                _pptShowActive = false;
+                _lastPptSlideIndex = 0;
+                _lastPptSlideTotal = 0;
+                PostPptSlideMessage(false, 0, 0);
+            }
+
+            if (_lastPptModeEnabled || _lastPptModeSeewo)
+            {
+                _lastPptModeEnabled = false;
+                _lastPptModeSeewo = false;
+                PostPptModeMessage(false, false, 0);
+            }
+
+            if (_pageTurnActive || _pageTurnSeewo)
+            {
+                _pageTurnActive = false;
+                _pageTurnSeewo = false;
+                if (webView?.CoreWebView2 != null)
+                {
+                    var json = JsonSerializer.Serialize(new { type = "pageTurnMode", enabled = false, seewo = false });
+                    try { webView.CoreWebView2.PostWebMessageAsJson(json); } catch { }
+                }
+            }
+            _autoOpenedForPpt = false;
+        }
+
+        // PPT 批注态下执行翻页动作后调用：立即探测一次页码，再由定时器延时复探一次
+        private void RequestPptSlideRefresh()
+        {
+            try { PollPowerPointShow(); } catch { }
+            if (_pptSlideRefreshTimer == null) return;
+            try
+            {
+                _pptSlideRefreshTimer.Stop();
+                _pptSlideRefreshTimer.Start();
+            }
+            catch { }
+        }
+
+        private static bool IsPagingAction(string action)
+        {
+            switch (action)
+            {
+                case "left": case "right": case "up": case "down":
+                case "pageup": case "pagedown":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private void PostPptModeMessage(bool enabled, bool seewo, int total)
+        {
+            if (webView?.CoreWebView2 == null) return;
+            try
+            {
+                var json = JsonSerializer.Serialize(new
+                {
+                    type = "pptMode",
+                    enabled = enabled,
+                    seewo = seewo,
+                    total = total
+                });
+                webView.CoreWebView2.PostWebMessageAsJson(json);
+            }
+            catch { }
+        }
+
+        // ===== PowerPoint COM 自动化（晚期绑定，不引用 PIA；仅接入已运行实例，不主动新建窗口）=====
+        // .NET (Core) 未提供 Marshal.GetActiveObject，这里直接 P/Invoke ole32；
+        // 快速路径按 ProgID 取 ROT 实例，失败时枚举 ROT 全部运行对象并探测 SlideShowWindows。
+        [DllImport("ole32.dll")]
+        private static extern int CLSIDFromProgID([MarshalAs(UnmanagedType.LPWStr)] string lpszProgID, out Guid pclsid);
+
+        [DllImport("ole32.dll")]
+        private static extern int GetActiveObject(ref Guid rclsid, IntPtr pvReserved, out IntPtr ppunk);
+
+        [DllImport("ole32.dll")]
+        private static extern int GetRunningObjectTable(int reserved, out IRunningObjectTable prot);
+
+        [ComImport, Guid("0000000F-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IMoniker { }
+
+        [ComImport, Guid("00000102-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IEnumMoniker
+        {
+            [PreserveSig] int Next(int celt, [MarshalAs(UnmanagedType.IUnknown)] out object? rgelt, out int pceltFetched);
+            [PreserveSig] int Skip(int celt);
+            void Reset();
+            void Clone(out IEnumMoniker ppenum);
+        }
+
+        [ComImport, Guid("00000010-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IRunningObjectTable
+        {
+            void Register(int grfFlags, [MarshalAs(UnmanagedType.IUnknown)] object punkObject, IMoniker pmkObjectName, out int dwRegister);
+            void Revoke(int dwRegister);
+            [PreserveSig] int IsRunning(IMoniker pmkObjectName);
+            [PreserveSig] int GetObject(IMoniker pmkObjectName, [MarshalAs(UnmanagedType.IUnknown)] out object? ppunkObject);
+            void NoteChangeTime(int dwRegister, IntPtr pfiletime);
+            void GetTimeOfLastChange(IMoniker pmkObjectName, IntPtr pfiletime);
+            [PreserveSig] int EnumRunning(out IEnumMoniker ppenumMoniker);
+        }
+
+        private object? TryGetPptComApp()
+        {
+            if (_pptComApp != null)
+            {
+                try { _ = ((dynamic)_pptComApp).SlideShowWindows.Count; return _pptComApp; }
+                catch { ReleasePptComObject(); }
+            }
+
+            // 快速路径：按 ProgID 从 ROT 取运行实例
+            IntPtr punk = IntPtr.Zero;
+            try
+            {
+                Guid clsid;
+                if (CLSIDFromProgID("PowerPoint.Application", out clsid) == 0 &&
+                    GetActiveObject(ref clsid, IntPtr.Zero, out punk) == 0 && punk != IntPtr.Zero)
+                {
+                    _pptComApp = System.Runtime.InteropServices.Marshal.GetObjectForIUnknown(punk);
+                    return _pptComApp;
+                }
+            }
+            catch { _pptComApp = null; }
+            finally
+            {
+                if (punk != IntPtr.Zero)
+                {
+                    try { System.Runtime.InteropServices.Marshal.Release(punk); } catch { }
+                }
+            }
+
+            // 兜底：枚举 ROT 全部运行对象，探测出带 SlideShowWindows 集合的 PowerPoint 实例
+            _pptComApp = FindPptAppFromRot();
+            return _pptComApp;
+        }
+
+        private object? FindPptAppFromRot()
+        {
+            try
+            {
+                if (GetRunningObjectTable(0, out var rot) != 0 || rot == null) return null;
+                if (rot.EnumRunning(out var en) != 0 || en == null) return null;
+                while (true)
+                {
+                    if (en.Next(1, out var mk, out int fetched) != 0 || fetched < 1 || mk == null) break;
+                    try
+                    {
+                        if (rot.GetObject((IMoniker)mk, out var obj) == 0 && obj != null)
+                        {
+                            dynamic d = obj;
+                            _ = d.SlideShowWindows.Count;
+                            return obj;
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private void ReleasePptComObject()
+        {
+            if (_pptComApp != null)
+            {
+                try { System.Runtime.InteropServices.Marshal.ReleaseComObject(_pptComApp); } catch { }
+                _pptComApp = null;
+            }
+        }
+
+        // 取当前放映窗口的 View；无放映窗口时返回 null
+        private dynamic? GetShowView()
+        {
+            object? app = TryGetPptComApp();
+            if (app == null)
+            {
+                Debug.WriteLine("[PPT] COM 未取得 PowerPoint 实例（ROT/GetActiveObject 均失败）");
+                return null;
+            }
+            try
+            {
+                dynamic d = app;
+                int count = Convert.ToInt32(d.SlideShowWindows.Count);
+                if (count >= 1)
+                {
+                    // 显式调用 Item(1) 优先，避免晚期绑定把集合索引器 [1] 误解析为不存在的默认属性；
+                    // Item 取不到时回退到 [1] 索引器，兼容不同 Office 版本的 IDispatch 暴露方式。
+                    dynamic win;
+                    try { win = d.SlideShowWindows.Item(1); }
+                    catch { win = d.SlideShowWindows[1]; }
+                    return win.View;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[PPT] GetShowView 取放映窗口失败: {ex.Message}");
+            }
+            return null;
+        }
+
+        // 轮询放映状态：有放映窗口时读取页码并在变化时通知 HTML；放映结束时通知退出批注模式
+        private void PollPowerPointShow()
+        {
+            try
+            {
+                dynamic? view = GetShowView();
+                if (view == null)
+                {
+                    if (_pptShowActive)
+                    {
+                        Debug.WriteLine("[PPT] 放映窗口已关闭，退出批注态");
+                        _pptShowActive = false;
+                        _lastPptSlideIndex = 0;
+                        _lastPptSlideTotal = 0;
+                        PostPptSlideMessage(false, 0, 0);
+                    }
+                    return;
+                }
+
+                int index = 0, total = 0;
+                try
+                {
+                    // 优先用放映位置 CurrentShowPosition（直接反映当前放映到第几张）；
+                    // 不可用时回退到 view.Slide.SlideIndex。
+                    try { index = Convert.ToInt32(view.CurrentShowPosition); }
+                    catch
+                    {
+                        dynamic slide = view.Slide;
+                        index = Convert.ToInt32(slide.SlideIndex);
+                    }
+                    try { dynamic pres = view.Presentation; total = Convert.ToInt32(pres.Slides.Count); }
+                    catch { total = 0; }
+                    Debug.WriteLine($"[PPT] 读取页码: index={index}, total={total}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[PPT] 读取页码失败: {ex.Message}");
+                    return;
+                }
+
+                if (!_pptShowActive)
+                {
+                    _pptShowActive = true;
+                    _lastPptSlideIndex = index;
+                    _lastPptSlideTotal = total;
+                    PostPptSlideMessage(true, index, total);
+                    EnsureTransparentForPpt();
+                    return;
+                }
+
+                if (index != _lastPptSlideIndex || total != _lastPptSlideTotal)
+                {
+                    _lastPptSlideIndex = index;
+                    _lastPptSlideTotal = total;
+                    PostPptSlideMessage(true, index, total);
+                }
+            }
+            catch { }
+        }
+
+        private void PostPptSlideMessage(bool active, int index, int total)
+        {
+            if (webView?.CoreWebView2 == null) return;
+            try
+            {
+                var json = JsonSerializer.Serialize(new
+                {
+                    type = "pptSlide",
+                    active = active,
+                    index = index,
+                    total = total
+                });
+                webView.CoreWebView2.PostWebMessageAsJson(json);
+            }
+            catch { }
+        }
+
+        // 白板已展开但未进入透明模式时，自动调用 HTML toggleTransparentMode() 开启叠加批注；
+        // 每轮轮询重试，直到 HTML 回调 setTransparentMode 把 _transparentMode 置为 true
+        private void EnsureTransparentForPpt()
+        {
+            if (!expanded || _transparentMode) return;
+            if (webView?.CoreWebView2 == null) return;
+            try
+            {
+                _ = webView.CoreWebView2.ExecuteScriptAsync(
+                    "if(typeof state!=='undefined'&&state&&!state.transparentMode&&typeof toggleTransparentMode==='function'){toggleTransparentMode();}");
+            }
+            catch { }
+        }
+
+        // 通过 COM 执行放映动作；COM 不可用或调用失败时返回 false，由调用方回退到按键模拟
+        private bool TryPptComAction(string action)
+        {
+            dynamic? view = GetShowView();
+            if (view == null) return false;
+            try
+            {
+                switch (action)
+                {
+                    case "next": view.Next(); return true;
+                    case "prev": view.Previous(); return true;
+                    case "exit": view.Exit(); return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+
+        // 处理 HTML 翻页按钮动作：
+        // PowerPoint 放映优先使用 COM View.Next()/Previous()/Exit()；希沃白板等其余目标保留按键模拟。
+        private void HandlePageTurnAction(string action)
+        {
+            try
+            {
+                bool pptActive = _pptShowActive || _lastDetectedApp == PageTurnApp.PowerPoint;
+                bool comDone = false;
+                if (pptActive)
+                {
+                    string comAction;
+                    switch (action)
+                    {
+                        case "right": case "down": case "pagedown": comAction = "next"; break;
+                        case "left": case "up": case "pageup": comAction = "prev"; break;
+                        case "exit": comAction = "exit"; break;
+                        default: comAction = null; break;
+                    }
+                    // 退出优先 COM View.Exit()（仅结束放映，不关闭 PowerPoint 窗口）；
+                    // COM 不可用时回退 Esc 结束放映，绝不 Alt+F4 关掉程序窗口。
+                    if (comAction == "exit")
+                    {
+                        if (!TryPptComAction("exit"))
+                        {
+                            IntPtr t = FindPageTurnTargetWindow();
+                            if (t != IntPtr.Zero) { GiveFocusToWindow(t); SimulateKey(0, Keys.Escape); }
+                        }
+                        return;
+                    }
+                    if (comAction != null) comDone = TryPptComAction(comAction);
+                }
+
+                if (!comDone)
+                {
+                    IntPtr target = FindPageTurnTargetWindow();
+                    if (target != IntPtr.Zero)
+                    {
+                        GiveFocusToWindow(target);
+
+                        switch (action)
+                        {
+                            case "exit":
+                                SimulateKey((byte)Keys.LMenu, Keys.F4); // Alt+F4 退出放映
+                                break;
+                            case "left":
+                                SimulateKey(0, Keys.Left); // 上一页
+                                break;
+                            case "right":
+                                SimulateKey(0, Keys.Right); // 下一页
+                                break;
+                            case "up":
+                                SimulateKey(0, Keys.Up);
+                                break;
+                            case "down":
+                                SimulateKey(0, Keys.Down);
+                                break;
+                            case "pageup":
+                                SimulateKey(0, Keys.PageUp);
+                                break;
+                            case "pagedown":
+                                SimulateKey(0, Keys.PageDown);
+                                break;
+                        }
+                    }
+                }
+
+                // PPT 放映批注态下，每按一次左/右（含上下翻页/PageUp/PageDown）触发一次页码检测：
+                // 立即探测一次，定时器再延时复探一次，避免依赖 1s 定时轮询造成页码/笔迹切换滞后
+                if (pptActive && IsPagingAction(action)) RequestPptSlideRefresh();
+            }
+            catch { }
+        }
+
+
+        // 确定翻页按键应发送的目标窗口：优先当前前台的外部窗口；
+        // 若前台是本程序自身窗口（含白板 webview），则退回最近记录的下层窗口或白板正下方窗口。
+        private IntPtr FindPageTurnTargetWindow()
+        {
+            IntPtr fg = GetForegroundWindow();
+            if (fg != IntPtr.Zero && !IsOwnWindow(fg)) return fg;
+
+            if (_previousForegroundWindow != IntPtr.Zero &&
+                IsWindow(_previousForegroundWindow) &&
+                IsWindowVisible(_previousForegroundWindow) &&
+                !IsOwnWindow(_previousForegroundWindow))
+            {
+                return _previousForegroundWindow;
+            }
+
+            return FindWindowBelowWebLayer();
+        }
+
+        // 模拟一次按键（可按需携带 Alt 修饰键），发送到当前前台窗口
+        private static void SimulateKey(byte modifier, Keys key)
+        {
+            byte vk = (byte)key;
+            if (modifier != 0) keybd_event(modifier, 0, 0, UIntPtr.Zero);
+            keybd_event(vk, 0, 0, UIntPtr.Zero);
+            keybd_event(vk, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            if (modifier != 0) keybd_event(modifier, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        }
+        #endregion
+
+        #region PageTurnKeyboardForward (forward arrow/page keys from WebView to lower window)
+        private const int WM_KEYDOWN = 0x0100;
+        private const int WM_KEYUP = 0x0101;
+        private const int WM_SYSKEYDOWN = 0x0104;
+        private const int WM_SYSKEYUP = 0x0105;
+
+        // IMessageFilter: intercept keys before dispatch so HTML never receives them; forward via C#
+        public bool PreFilterMessage(ref Message m)
+        {
+            // only while page-turn mode active (transparent mode && powerpnt/easinote running)
+            if (!_pageTurnActive) return false;
+
+            bool isDown = m.Msg == WM_KEYDOWN || m.Msg == WM_SYSKEYDOWN;
+            bool isUp = m.Msg == WM_KEYUP || m.Msg == WM_SYSKEYUP;
+            if (!isDown && !isUp) return false;
+
+            // only intercept keys targeted at the main WebView (or its child windows)
+            if (!IsWebViewWindow(m.HWnd)) return false;
+
+            // keys to forward to the lower window: arrows + page/locate keys
+            Keys key = (Keys)(int)m.WParam;
+            switch (key)
+            {
+                case Keys.Left:
+                case Keys.Right:
+                case Keys.Up:
+                case Keys.Down:
+                case Keys.PageUp:
+                case Keys.PageDown:
+                case Keys.Home:
+                case Keys.End:
+                case Keys.Space:
+                case Keys.Return:
+                    break;
+                default:
+                    return false;
+            }
+
+            // forward on key-down; on key-up just swallow to avoid a stray keyup in HTML
+            if (isDown)
+            {
+                ForwardKeyToLowerWindow(key);
+            }
+
+            return true; // handled: HTML does not receive this key
+        }
+
+        // check whether an hWnd belongs to the main WebView or any of its descendants
+        private bool IsWebViewWindow(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero) return false;
+            if (webView == null || webView.IsDisposed) return false;
+            IntPtr root = webView.Handle;
+            if (root == IntPtr.Zero) return false;
+
+            IntPtr h = hWnd;
+            while (h != IntPtr.Zero)
+            {
+                if (h == root) return true;
+                h = GetParent(h);
+            }
+            return false;
+        }
+
+        // 键盘转发：PowerPoint 放映用 COM 翻页；其余目标（希沃白板等）模拟按键到下层窗口
+        private void ForwardKeyToLowerWindow(Keys key)
+        {
+            try
+            {
+                bool pptActive = _pptShowActive || _lastDetectedApp == PageTurnApp.PowerPoint;
+                bool comDone = false;
+                if (pptActive)
+                {
+                    string comAction = null;
+                    switch (key)
+                    {
+                        case Keys.Right: case Keys.Down: case Keys.PageDown:
+                        case Keys.Space: case Keys.Return: comAction = "next"; break;
+                        case Keys.Left: case Keys.Up: case Keys.PageUp: comAction = "prev"; break;
+                    }
+                    // COM 成功即结束；否则回退到按键模拟（方向键 / 空格 / 回车）
+                    if (comAction != null) comDone = TryPptComAction(comAction);
+                }
+
+                if (!comDone)
+                {
+                    IntPtr target = FindPageTurnTargetWindow();
+                    if (target != IntPtr.Zero)
+                    {
+                        GiveFocusToWindow(target);
+                        SimulateKey(0, key);
+                    }
+                }
+
+                // PPT 放映批注态下，键盘翻页后同样触发一次页码检测
+                if (pptActive && IsPagingKey(key)) RequestPptSlideRefresh();
+            }
+            catch { }
+        }
+
+        private static bool IsPagingKey(Keys key)
+        {
+            switch (key)
+            {
+                case Keys.Left: case Keys.Right: case Keys.Up: case Keys.Down:
+                case Keys.PageUp: case Keys.PageDown: case Keys.Space: case Keys.Return:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         #endregion
 
         private string ResolveHtmlPath(string fileName)
@@ -2122,10 +3046,18 @@ namespace _01
         [DllImport("user32.dll")]
         private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
 
+        private const int KEYEVENTF_KEYUP = 0x0002;
+
+        [DllImport("user32.dll")]
+        private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
         [DllImport("user32.dll")]
         private static extern bool GetCursorPos(out POINT lpPoint);
         [DllImport("user32.dll")]
         private static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetParent(IntPtr hWnd);
 
         [DllImport("comctl32.dll", SetLastError = true)]
         private static extern bool SetWindowSubclass(IntPtr hWnd, WndSubclassProc pfnSubclass, UIntPtr uIdSubclass, UIntPtr dwRefData);
@@ -2239,6 +3171,57 @@ namespace _01
         [DllImport("user32.dll")]
         private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
+        private const int GWL_STYLE = -16;
+        private const uint WS_CAPTION = 0x00C00000;
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        // 进程快照：用于采集 父进程ID -> 子进程PID 映射（判断 PPT 子进程是否存在全屏窗口）
+        private const uint TH32CS_SNAPPROCESS = 0x00000002;
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
+
+        [DllImport("kernel32.dll")]
+        private static extern bool Process32First(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+
+        [DllImport("kernel32.dll")]
+        private static extern bool Process32Next(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+
+        [DllImport("kernel32.dll")]
+        private static extern bool CloseHandle(IntPtr hObject);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        private struct PROCESSENTRY32
+        {
+            public uint dwSize;
+            public uint cntUsage;
+            public uint th32ProcessID;
+            public IntPtr th32DefaultHeapID;
+            public uint th32ModuleID;
+            public uint cntThreads;
+            public uint th32ParentProcessID;
+            public int pcPriClassBase;
+            public uint dwFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+            public string szExeFile;
+        }
+
         private static void SetToolWindow(IntPtr hWnd)
         {
             int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
@@ -2249,4 +3232,4 @@ namespace _01
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData) => true;
     }
 }
-//（注：内容由AI生成）
+
